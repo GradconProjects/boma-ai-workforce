@@ -1,13 +1,8 @@
-import { findSecrets, PROTECTED_ACTION_CAP, type Policy } from "@boma/core";
+import { findSecrets, PROTECTED_ACTION_CAP, type OwnerUnlock, type Policy } from "@boma/core";
 import type { BotDefinition, BotFrontmatter } from "./schema";
 import { KNOWN_TOOLS } from "./tools";
 
-export interface OwnerUnlock {
-  action: string;
-  bot_slug: string;
-  new_level: number;
-  expires_at?: Date | null;
-}
+export type { OwnerUnlock };
 
 /** Who produced this version. Only "owner" and "git-sync" may widen permissions. */
 export type EditSource = "owner" | "git-sync" | "bot";

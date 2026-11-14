@@ -1,5 +1,5 @@
 import type { Client } from "pg";
-import type { Policy } from "@boma/core";
+import type { Policy, Queryable } from "@boma/core";
 import { lintBot, type OwnerUnlock } from "./lint";
 import type { BotDefinition } from "./schema";
 
@@ -8,13 +8,20 @@ export type SyncResult =
   | { slug: string; status: "created" | "updated"; version: number }
   | { slug: string; status: "rejected"; errors: string[] };
 
-export async function loadUnlocks(client: Client): Promise<OwnerUnlock[]> {
+export async function loadUnlocks(client: Queryable): Promise<OwnerUnlock[]> {
   const { rows } = await client.query<OwnerUnlock>(
-    `select u.action, b.slug as bot_slug, u.new_level, u.expires_at
-       from policy_unlocks u join bots b on b.id = u.bot_id
+    `select u.action, b.slug as bot_slug, w.slug as workspace_slug, u.new_level, u.expires_at
+       from policy_unlocks u join bots b on b.id = u.bot_id left join workspaces w on w.id = u.workspace_id
       where u.expires_at is null or u.expires_at > now()`,
   );
   return rows;
+}
+
+/** Make sure every workspace a bot names has a row (rules are filled in by the owner). */
+export async function ensureWorkspaces(client: Queryable, slugs: string[]): Promise<void> {
+  for (const slug of new Set(slugs)) {
+    await client.query("insert into workspaces (slug, name) values ($1, $1) on conflict (slug) do nothing", [slug]);
+  }
 }
 
 /**
@@ -28,6 +35,7 @@ export async function syncBot(client: Client, bot: BotDefinition, policy: Policy
     return { slug: fm.slug, status: "rejected", errors: report.errors.map((e) => `${e.rule}: ${e.message}`) };
   }
 
+  await ensureWorkspaces(client, fm.workspaces);
   await client.query("begin");
   try {
     const existing = await client.query<{ id: string; file_sha: string | null; version: number | null }>(

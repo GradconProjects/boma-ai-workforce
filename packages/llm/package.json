@@ -1,0 +1,14 @@
+{
+  "name": "@boma/llm",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.8.0",
+    "@boma/core": "workspace:*",
+    "openai": "7.57.0",
+    "zod": "4.6.7"
+  }
+}
