@@ -75,7 +75,6 @@ export default async function Bots() {
   const card = (b: (typeof bots)[number], lead = false) => {
     const fm = b.frontmatter;
     const t = tally(b.slug);
-    const spent = budget.byScope[`bot:${b.slug}`] ?? 0;
     const myAccounts = grants.filter((g) => g.bot === b.slug).map((g) => g.account);
     const actions = Object.entries(fm.actions ?? {}).filter(([, lvl]) => Number(lvl) > 1);
     return (
