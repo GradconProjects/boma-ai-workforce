@@ -232,7 +232,11 @@ export class ChiefOfStaff {
 
     // Skills: a clear trigger phrase routes straight to the skill (no classification call).
     const skills = await this.enabledSkills();
-    const strong = matchSkills(request, skills, 1)[0];
+    // Publishing work (blog articles, page posts) always goes to the planner, which can still
+    // bring skills in; a skill alone would only return advice.
+    const publishingJob =
+      /\b(blog|article)s?\b/i.test(request) || /\b(facebook|page) posts?\b/i.test(request);
+    const strong = publishingJob ? undefined : matchSkills(request, skills, 1)[0];
     if (strong?.strong) {
       return this.runSkill(
         skills.find((s) => s.fm.slug === strong.slug)!,
@@ -244,7 +248,11 @@ export class ChiefOfStaff {
     const c = await this.classify(request, alreadyClarified, bot, skills);
     // The model may only name a skill from the catalogue; anything else is ignored.
     const picked = c.skill ? skills.find((s) => s.fm.slug === c.skill) : undefined;
-    if (picked && (c.intent === "new_job" || c.intent === "question" || c.intent === "unclear")) {
+    if (
+      picked &&
+      !publishingJob &&
+      (c.intent === "new_job" || c.intent === "question" || c.intent === "unclear")
+    ) {
       return this.runSkill(picked, request, messageId);
     }
     // C3: exactly one clarifying question, never a second.
@@ -266,7 +274,7 @@ export class ChiefOfStaff {
       return;
     }
     if (intent === "bot_edit") return this.command("/edit");
-    if (intent === "question") return this.answer(request, bot);
+    if (intent === "question" && !publishingJob) return this.answer(request, bot);
     return this.planAndDispatch(request, messageId, bot);
   }
 
