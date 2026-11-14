@@ -51,6 +51,16 @@ export async function migrateUp(client: Client, migrations = readMigrations()): 
     if (done.has(m.version)) continue;
     await client.query("begin");
     try {
+      // Transaction-scoped lock (works through connection poolers, released at commit/rollback):
+      // concurrent starters wait here, then see the migration is already applied.
+      await client.query("select pg_advisory_xact_lock(7243002)");
+      const already = await client.query("select 1 from schema_migrations where version = $1", [
+        m.version,
+      ]);
+      if (already.rows.length) {
+        await client.query("commit");
+        continue;
+      }
       await client.query(m.up);
       await client.query("insert into schema_migrations (version) values ($1)", [m.version]);
       await client.query("commit");

@@ -58,12 +58,12 @@ export function isSimulated(env: Env): boolean {
 
 /**
  * Once per deployment (keyed by commit): apply new migrations, sync bot files, workspace rules
- * and starter brands. Guarded by an advisory lock so concurrent cold starts don't race.
+ * and starter brands. Migrations take a transaction-scoped lock (safe through poolers); the rest
+ * runs once per deployment via setStateOnce.
  */
 export async function syncDeployment(db: pg.Pool, root: string, policy: Policy): Promise<boolean> {
   const client = await db.connect();
   try {
-    await client.query("select pg_advisory_lock(7243002)");
     await migrateUp(client, readMigrations(join(root, "packages/db/migrations")));
     const key = `deploy_sync:${process.env.VERCEL_GIT_COMMIT_SHA ?? "local"}`;
     if (!(await setStateOnce(client, key, new Date().toISOString()))) return false;
@@ -76,7 +76,6 @@ export async function syncDeployment(db: pg.Pool, root: string, policy: Policy):
     await seedBrands(client);
     return true;
   } finally {
-    await client.query("select pg_advisory_unlock(7243002)").catch(() => undefined);
     client.release();
   }
 }
