@@ -337,7 +337,6 @@ export class DualReviewer {
     ref: ModelRef,
     output: MakerOutput,
   ) {
-    let costAud = 0;
     for (let attempt = 1; attempt <= 2; attempt++) {
       const r = await this.withAvailability(cfg, async () => {
         try {
@@ -349,7 +348,7 @@ export class DualReviewer {
         }
       });
       if (r === "unavailable") return "unavailable" as const;
-      if (r.ok) return { verdict: r.verdict, costAud: costAud + r.costAud };
+      if (r.ok) return { verdict: r.verdict, costAud: r.costAud };
     }
     return "malformed" as const;
   }
