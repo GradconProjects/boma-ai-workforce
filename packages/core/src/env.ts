@@ -62,7 +62,17 @@ export const envSchema = z.object({
       .refine((v) => decodedKeyLength(v) === 32, "must decode to exactly 32 bytes (hex or base64)")
       .optional(),
   ),
-  TZ: z.preprocess(blankToUndefined, z.string().default("Australia/Sydney")),
+  // Hosts set their own TZ (Vercel uses ":UTC"); only a valid IANA zone overrides the default.
+  TZ: z.preprocess((v) => {
+    const t = blankToUndefined(v);
+    if (typeof t !== "string") return undefined;
+    try {
+      new Intl.DateTimeFormat("en-AU", { timeZone: t });
+      return t;
+    } catch {
+      return undefined;
+    }
+  }, z.string().default("Australia/Sydney")),
 
   SKILLS_PASSCODE: z.preprocess(
     blankToUndefined,

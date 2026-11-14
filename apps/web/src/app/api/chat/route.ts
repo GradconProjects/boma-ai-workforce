@@ -11,6 +11,7 @@ const unauthorised = () => NextResponse.json({ error: "Please sign in again." },
 
 export async function GET(req: Request) {
   if (!(await isOwner())) return unauthorised();
+  await runtime(); // a fresh deploy applies its database updates first
   const q = new URL(req.url).searchParams;
   const conversationId = q.get("c") ?? undefined;
   if (!isUuid(conversationId)) return NextResponse.json({ messages: [] });

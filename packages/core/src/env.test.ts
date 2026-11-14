@@ -56,4 +56,8 @@ describe("env loading", () => {
     const keys = [...example.matchAll(/^([A-Z][A-Z0-9_]*)=/gm)].map((m) => m[1]).sort();
     expect(keys).toEqual(Object.keys(envSchema.shape).sort());
   });
+  it("ignores a host-set TZ that isn't a real time zone (Vercel sets :UTC)", () => {
+    expect(parseEnv({ TZ: ":UTC" }).TZ).toBe("Australia/Sydney");
+    expect(parseEnv({ TZ: "Australia/Melbourne" }).TZ).toBe("Australia/Melbourne");
+  });
 });

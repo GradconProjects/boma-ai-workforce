@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isUuid, listConversations, updateConversation } from "@boma/worker/hosted";
+import { runtime } from "@/lib/runtime";
 import { db, isOwner } from "@/lib/server";
 
 /** Recents: list, search, rename, pin and archive conversations. */
@@ -7,6 +8,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   if (!(await isOwner())) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
+  await runtime(); // a fresh deploy applies its database updates first
   const search = new URL(req.url).searchParams.get("q") ?? undefined;
   return NextResponse.json({ conversations: await listConversations(db(), { search, limit: 80 }) });
 }
