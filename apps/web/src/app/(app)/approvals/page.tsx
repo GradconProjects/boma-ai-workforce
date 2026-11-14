@@ -67,7 +67,6 @@ export default async function Approvals() {
               </pre>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-mist-400">
                 <span>{p.review}</span>
-                <span>AI cost A${Number(p.costAud ?? 0).toFixed(3)}</span>
               </div>
               <div className="mt-4 max-w-xs">
                 <ItemDecision approvalId={a.id} />

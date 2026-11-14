@@ -34,7 +34,6 @@ export default async function SkillRun({ params }: { params: Promise<{ id: strin
           })}
         </span>
         <span>via {run.channel}</span>
-        {run.cost_aud !== null && <span>AI cost A${Number(run.cost_aud).toFixed(3)}</span>}
       </div>
       <article className="panel mt-6 rounded-3xl p-6">
         {working && (

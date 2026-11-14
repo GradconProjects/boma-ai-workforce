@@ -7,9 +7,10 @@ anthropic:
   claude-haiku-5-5: { input: 0.10, output: 0.50 } # prompts up to 100K tokens
   claude-opus-5-5: { input: 4.00, output: 20.00 }
 
-openai: {}
-# Add your checker models once chosen, e.g.:
-#   <model-id>: { input: 0.00, output: 0.00 }
+# Verified 14 Nov 2026 at platform.openai.com/docs/pricing (standard, short context).
+openai:
+  gpt-6.1-sol: { input: 2.00, output: 10.00 }
+  gpt-6-luna: { input: 0.10, output: 0.50 }
 
 # DeepSeek: priced at PEAK rates (off-peak is half) so estimates are never low. Verified
 # 14 Nov 2026 at api-docs.deepseek.com/quick_start/pricing (cache-miss input).

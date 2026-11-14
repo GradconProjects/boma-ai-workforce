@@ -99,7 +99,7 @@ export default async function Bots() {
             <span>
               30 days: {t.done ?? 0} done ·{" "}
               {(t.queued ?? 0) + (t.running ?? 0) + (t.in_review ?? 0)} in progress ·{" "}
-              {t.awaiting_approval ?? 0} awaiting you · A${spent.toFixed(2)} this month
+              {t.awaiting_approval ?? 0} awaiting you
             </span>
             <span className="text-mist-400 group-open:rotate-90">›</span>
           </summary>

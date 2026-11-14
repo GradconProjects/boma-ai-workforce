@@ -36,36 +36,59 @@ export interface AppOptions {
   appUrl?: string;
 }
 
+/**
+ * Which AI does which job (owner's routing, 14 Nov 2026):
+ * - easy work (understanding messages, quick answers, simple skills) → DeepSeek
+ * - deep reasoning (plans, strategy, drafting, most skills) → OpenAI
+ * - checking the other AIs' work, and document formatting → Claude
+ * Each role falls back to Claude when its provider isn't configured. Maker and checker are
+ * always different providers, as the dual review requires.
+ */
 export function modelsFromEnv(env: Env) {
   const need = (v: string | undefined, name: string) => {
     if (!v) throw new Error(`${name} is not set in .env`);
     return v;
   };
-  const cheap: ModelRef = {
-    provider: "anthropic",
-    model: need(env.ANTHROPIC_MODEL_CHEAP, "ANTHROPIC_MODEL_CHEAP"),
-  };
-  const planner: ModelRef = {
+  const claudeMaker: ModelRef = {
     provider: "anthropic",
     model: need(env.ANTHROPIC_MODEL_MAKER, "ANTHROPIC_MODEL_MAKER"),
   };
-  // Checker: OpenAI by default; DeepSeek when only DeepSeek is configured. Either way it is a
-  // different provider from the maker (Claude), as the dual review requires.
+  const claudeCheap: ModelRef = {
+    provider: "anthropic",
+    model: need(env.ANTHROPIC_MODEL_CHEAP, "ANTHROPIC_MODEL_CHEAP"),
+  };
+  const deepseek: ModelRef | undefined =
+    env.DEEPSEEK_API_KEY && env.DEEPSEEK_MODEL
+      ? { provider: "deepseek", model: env.DEEPSEEK_MODEL }
+      : undefined;
+  const openaiReasoning: ModelRef | undefined =
+    env.OPENAI_API_KEY && env.OPENAI_MODEL_REASONING
+      ? { provider: "openai", model: env.OPENAI_MODEL_REASONING }
+      : undefined;
+
+  const cheap = deepseek ?? claudeCheap;
+  const planner = openaiReasoning ?? claudeMaker;
+  const formatter = claudeMaker;
+
   let checker: ModelRef;
   let checkerStrong: ModelRef | undefined;
-  if (env.OPENAI_MODEL_CHECKER) {
+  if (planner.provider !== "anthropic") {
+    checker = { provider: "anthropic", model: env.ANTHROPIC_MODEL_CHECKER ?? claudeMaker.model };
+  } else if (env.OPENAI_MODEL_CHECKER) {
     checker = { provider: "openai", model: env.OPENAI_MODEL_CHECKER };
     checkerStrong = env.OPENAI_MODEL_CHECKER_STRONG
       ? { provider: "openai", model: env.OPENAI_MODEL_CHECKER_STRONG }
       : undefined;
+  } else if (deepseek) {
+    checker = deepseek;
   } else if (env.DEEPSEEK_MODEL) {
     checker = { provider: "deepseek", model: env.DEEPSEEK_MODEL };
   } else {
     throw new Error(
-      "Set OPENAI_MODEL_CHECKER (or DEEPSEEK_MODEL) in .env for the dual review checker",
+      "Set OPENAI_MODEL_REASONING, OPENAI_MODEL_CHECKER or DEEPSEEK_MODEL in .env so the dual review has a second AI",
     );
   }
-  return { cheap, planner, checker, checkerStrong };
+  return { cheap, planner, checker, checkerStrong, formatter };
 }
 
 export async function buildApp(o: AppOptions) {

@@ -23,6 +23,7 @@ import {
   Rocket,
   Search,
   Settings,
+  Wallet,
   SquarePen,
   X,
   type LucideIcon,
@@ -351,7 +352,13 @@ function Sidebar({
               href="/overview"
               className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-white/5"
             >
-              <LayoutDashboard className="size-4" /> Overview: spend and work
+              <LayoutDashboard className="size-4" /> Overview
+            </Link>
+            <Link
+              href="/spend"
+              className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 hover:bg-white/5"
+            >
+              <Wallet className="size-4" /> Spend: AI costs
             </Link>
             {SOON.map(({ label, icon: Icon }) => (
               <div

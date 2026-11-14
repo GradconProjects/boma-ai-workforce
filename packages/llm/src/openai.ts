@@ -27,6 +27,10 @@ export class OpenAIProvider implements LlmProvider {
         input: req.input,
         max_output_tokens: req.maxOutputTokens,
         store: false, // do not keep owner content on the provider side
+        // Reasoning models take an effort level; older chat models reject the field.
+        ...(req.effort && /^(gpt-[56]|o\d)/.test(req.model)
+          ? { reasoning: { effort: req.effort } }
+          : {}),
         ...(req.schema
           ? {
               text: {

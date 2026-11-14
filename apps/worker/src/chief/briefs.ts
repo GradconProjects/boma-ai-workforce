@@ -45,9 +45,15 @@ export async function morningBrief(
     `Done yesterday: ${counts.done ?? 0} · Approved: ${counts.approved ?? 0} · Failed: ${counts.failed ?? 0} · Expired: ${counts.expired ?? 0}`,
     `Waiting for your approval: ${approvals.length}${approvals.length ? " (/approvals)" : ""}`,
     ...failures.map((f) => `❌ ${f.kind}: ${f.last_error ?? "unknown error"}`),
-    `Spend this month: A$${budget.spentAud.toFixed(2)} of A$${budget.hardStopAud.toFixed(2)}${budget.stopped ? " ⛔ budget stop reached" : budget.warn ? " ⚠️ past warning level" : ""}`,
+    budget.stopped
+      ? "⛔ AI budget stop reached: no new paid work this month (see Spend)."
+      : budget.warn
+        ? "⚠️ AI spend has passed the warning level (see Spend)."
+        : "",
     "Scheduled today: nothing scheduled (publishing arrives in Phase 2).",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 export async function eveningReport(
@@ -66,6 +72,8 @@ export async function eveningReport(
     approvals.length
       ? `Needs a decision: ${approvals.length} approval(s) — /approvals`
       : "Nothing needs a decision.",
-    `Spend this month: A$${budget.spentAud.toFixed(2)} of A$${budget.hardStopAud.toFixed(2)}.`,
-  ].join("\n");
+    budget.stopped ? "⛔ AI budget stop reached (see Spend)." : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 }

@@ -10,6 +10,9 @@ export const SIM_MODELS = {
   ANTHROPIC_MODEL_MAKER: "sim-claude-maker",
   ANTHROPIC_MODEL_CHEAP: "sim-claude-cheap",
   OPENAI_MODEL_CHECKER: "sim-openai-checker",
+  // Simulation always uses its scripted Claude + OpenAI pair, whatever real routing is set.
+  OPENAI_MODEL_REASONING: "",
+  DEEPSEEK_MODEL: "",
 };
 
 export const simulationPrices = () =>

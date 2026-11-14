@@ -25,10 +25,16 @@ export const envSchema = z.object({
   ANTHROPIC_API_KEY: str(),
   ANTHROPIC_MODEL_MAKER: str(),
   ANTHROPIC_MODEL_CHEAP: str(),
+  /** Checks the other AIs' work, and formats documents. Default: ANTHROPIC_MODEL_MAKER. */
+  ANTHROPIC_MODEL_CHECKER: str(),
 
   OPENAI_API_KEY: str(),
   OPENAI_MODEL_CHECKER: str(),
   OPENAI_MODEL_CHECKER_STRONG: str(),
+  /** Deep reasoning (plans, strategy, drafting, skills). */
+  OPENAI_MODEL_REASONING: str(),
+  /** Image generation (Design Studio, later). */
+  OPENAI_MODEL_IMAGE: str(),
 
   DEEPSEEK_API_KEY: str(),
   DEEPSEEK_MODEL: str(),

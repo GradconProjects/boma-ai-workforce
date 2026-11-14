@@ -194,6 +194,6 @@ export function approvalMessage(
     "──────────",
     p.review,
     `When: ${a.scheduled_at ? formatLocal(a.scheduled_at, tz) : "when published (not scheduled)"}`,
-    `AI cost so far: A$${Number(p.costAud ?? 0).toFixed(3)} · Expires ${formatLocal(a.expires_at, tz)}`,
+    `Expires ${formatLocal(a.expires_at, tz)}`,
   ].join("\n");
 }

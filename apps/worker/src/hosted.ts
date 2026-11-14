@@ -43,7 +43,7 @@ export interface HostedRuntime {
 export function isSimulated(env: Env): boolean {
   if (process.env.BOMA_SIMULATION === "1") return true;
   const checker =
-    (env.OPENAI_API_KEY && env.OPENAI_MODEL_CHECKER) ||
+    (env.OPENAI_API_KEY && (env.OPENAI_MODEL_CHECKER || env.OPENAI_MODEL_REASONING)) ||
     (env.DEEPSEEK_API_KEY && env.DEEPSEEK_MODEL);
   return !(
     env.ANTHROPIC_API_KEY &&

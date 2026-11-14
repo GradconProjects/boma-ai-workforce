@@ -397,12 +397,7 @@ export class ChiefOfStaff {
       [
         plan.reply,
         ...(taskLines.length
-          ? [
-              "",
-              "Plan:",
-              ...taskLines,
-              `Estimated AI cost: A$${estimate.toFixed(2)}. Answers come back here; posts come back for approval.`,
-            ]
+          ? ["", "Plan:", ...taskLines, `Answers come back here; posts come back for approval.`]
           : []),
         ...(lines.length ? ["", ...lines] : []),
       ].join("\n"),
@@ -581,7 +576,7 @@ export class ChiefOfStaff {
     if (r.ok) {
       if (!r.duplicate)
         await this.deps.notify.send(
-          `🧠 Using ${skill.fm.name} (about A$${r.estimateAud.toFixed(2)}). I'll send the answer here shortly.`,
+          `🧠 Using ${skill.fm.name}. I'll send the answer here shortly.`,
         );
       return;
     }
