@@ -76,9 +76,9 @@ export function draftPostHandler(deps: DraftPostDeps): TaskHandler {
               claimRegister: rules.claim_register,
               bannedPatterns: rules.banned_patterns,
               workspaceNotes: rules.notes,
-              rubricExtras: [],
+              rubricExtras: postRubric(rules.style),
               platform: { name: "Facebook Page post", maxChars: 1500 },
-              makerGuidance: `Write one Facebook Page post for ${rules.name}. Use a short hook, plain English, and one clear call to action.`,
+              makerGuidance: postGuidance(rules.name, rules.style),
             },
             {
               maker: deps.models.planner,
@@ -210,4 +210,36 @@ export function approvalMessage(
     `When: ${a.scheduled_at ? formatLocal(a.scheduled_at, tz) : "when published (not scheduled)"}`,
     `Expires ${formatLocal(a.expires_at, tz)}`,
   ].join("\n");
+}
+
+/** How the maker writes posts: built to stop the scroll, start conversations and convert. */
+export function postGuidance(name: string, style: "standard" | "bold" = "standard"): string {
+  return [
+    `Write one Facebook Page post for ${name}. Goal: engagement and conversion.`,
+    "First line: a scroll-stopping hook (a surprising fact, a bold claim you can back up, a question, or a mini cliffhanger). Keep it under 15 words.",
+    "Voice: write like a creator, not a corporate brand. Casual, witty and relatable for a younger audience (Gen Z and millennials): short punchy lines, current internet culture and meme formats where they fit, Aussie slang used naturally, emojis that add meaning (not a wall of them). Never stiff, salesy or 'LinkedIn'.",
+    "Body: one idea, real specifics, give value or a laugh before asking for anything.",
+    "End with a comment call to action: a genuine question people will want to answer (pick a side, share their experience, name their favourite). Then, if the brief includes a link, invite them to read more at the link.",
+    "Never use engagement bait Facebook demotes ('comment YES', 'tag 5 friends', 'share if you agree').",
+    ...(style === "bold"
+      ? [
+          "Style: BOLD. Take a clear, provocative stance; hot takes, 'unpopular opinion', myth-busting and this-vs-that debates are encouraged. Friendly rivalry (states, cities, food, sport) is fair game.",
+          "Drama must be honest: no invented facts, statistics or quotes; no fake outrage; no attacks on real private people; nothing demeaning about race, religion, gender, disability or sexuality; no exploiting tragedies.",
+        ]
+      : []),
+  ].join("\n");
+}
+
+/** Extra checks the reviewer applies to posts (the base rubric covers accuracy and claims). */
+export function postRubric(style: "standard" | "bold" = "standard"): string[] {
+  return [
+    "Opens with a strong hook and ends with a genuine comment call to action (a question people want to answer).",
+    "No engagement bait Facebook demotes ('comment YES', 'tag friends', 'share if you agree').",
+    ...(style === "bold"
+      ? [
+          "Bold and provocative is WANTED here: do not mark a post down for being opinionated, cheeky or divisive about everyday topics.",
+          "Fail it if the drama relies on invented facts, defamation, targeting a real private person, demeaning a protected group, or exploiting a tragedy.",
+        ]
+      : []),
+  ];
 }

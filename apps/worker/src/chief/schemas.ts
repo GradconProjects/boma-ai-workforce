@@ -31,7 +31,14 @@ export const planSchema = z.object({
   unsupported: z.array(z.string()),
   /** New workspaces (businesses, pages, projects) the owner asked for by name. */
   new_workspaces: z
-    .array(z.object({ name: z.string(), description: z.string() }))
+    .array(
+      z.object({
+        name: z.string(),
+        description: z.string(),
+        /** bold when he wants drama, controversy, debate or rapid growth. */
+        style: z.enum(["standard", "bold"]).nullable().optional(),
+      }),
+    )
     .optional()
     .default([]),
   /** Any request to change a bot's permissions, tools, accounts, autonomy or budget. */

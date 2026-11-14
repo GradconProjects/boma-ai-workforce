@@ -287,9 +287,11 @@ function Sidebar({
     <div className="flex h-full flex-col px-3 py-3">
       <div className="mb-3 flex items-center justify-between px-1">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="grid size-8 place-items-center rounded-xl bg-gradient-to-br from-amber to-coral font-display text-sm font-extrabold text-ink-950">
-            B
-          </div>
+          <img
+            src="/brand/bot-avatar.webp"
+            alt=""
+            className="size-9 rounded-full ring-1 ring-amber/40 shadow-[0_0_18px_-4px_rgba(76,201,255,0.7)]"
+          />
           <span className="font-display text-[15px] font-bold">Boma Bot Pro</span>
         </Link>
         {onCollapse && (
@@ -458,7 +460,7 @@ export function Shell({
   return (
     <div className="flex h-dvh overflow-hidden">
       <aside
-        className={`hidden shrink-0 border-r border-white/5 bg-ink-950/80 backdrop-blur-xl transition-[width] lg:block ${collapsed ? "w-[60px]" : "w-[264px]"}`}
+        className={`hidden shrink-0 border-r border-amber/10 bg-ink-950/60 backdrop-blur-xl transition-[width] lg:block ${collapsed ? "w-[60px]" : "w-[264px]"}`}
       >
         <Sidebar
           pending={pending}

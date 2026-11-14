@@ -94,6 +94,7 @@ const HELP = [
   "/risk <name> high|standard – label a skill's risk",
   "/delete workspace <name> – remove a workspace you created",
   "/autopilot <workspace> on|off – auto-approve clean, reviewed posts (30 days)",
+  "/style <workspace> bold|standard – provocative, debate-starting posts (still truthful)",
 ].join("\n");
 
 export class ChiefOfStaff {
@@ -328,6 +329,7 @@ export class ChiefOfStaff {
       "Teamwork: when a post should build on a skill's answer (e.g. research or a strategy first, then posts), plan the skill_run first and set the draft_post's uses_output_of to the skill_run's index (0-based) in tasks. Otherwise uses_output_of is null. skill is null for draft_post.",
       "Be proactive: for anything about a page, blog, brand, audience, content or marketing, start with the content-strategist skill (or another fitting skill), then plan draft_post tasks that use its output. Plan several posts when that makes sense.",
       `Existing workspaces: ${workspaces.join(", ")}.`,
+      "Posts are written to engage and convert, ending with a comment call to action. If he wants drama, controversy, debate or fast growth for a page, set style 'bold' for its new workspace (or tell him to send /style <workspace> bold for an existing one).",
       "If he names a business, page, blog or project that is not an existing workspace, add it to new_workspaces (name exactly as he said it, plus a one-line description) and use its name as the workspace for its tasks. Never refuse because a workspace is missing.",
       "Do every part you can. Only list in `unsupported` what the system genuinely cannot do yet (for example: publishing live to Facebook before the Page is connected, building a website, sending email, spending money), and still plan the drafts and strategy for it.",
       "If the request asks to change any bot's permissions, tools, accounts, autonomy level or budget, list it in `permission_changes_requested` and do not plan tasks for it.",
@@ -375,7 +377,7 @@ export class ChiefOfStaff {
       const created = await this.deps.db.query(
         `insert into workspaces (slug, name, rules, owner_added) values ($1, $2, $3, true)
          on conflict (slug) do update set owner_added = true returning (xmax = 0) as inserted`,
-        [slug, name, { name, notes: [w.description.slice(0, 300)] }],
+        [slug, name, { name, notes: [w.description.slice(0, 300)], style: w.style ?? "standard" }],
       );
       await audit(this.deps.db, {
         actor: "owner",
@@ -673,6 +675,30 @@ export class ChiefOfStaff {
           target: ws.slug,
           result: "done",
         });
+        return;
+      }
+      case "/style": {
+        const level = args.at(-1)?.toLowerCase();
+        const name = args.slice(0, -1).join(" ").trim();
+        if (!name || (level !== "bold" && level !== "standard")) {
+          await this.deps.notify.send("Usage: /style <workspace> bold|standard");
+          return;
+        }
+        const r = await db.query<{ name: string }>(
+          `update workspaces set rules = jsonb_set(rules, '{style}', to_jsonb($2::text))
+            where slug = $1 or lower(name) = lower($1) returning name`,
+          [name, level],
+        );
+        if (!r.rows[0]) {
+          await this.deps.notify.send(`No workspace called "${name}".`);
+          return;
+        }
+        await audit(db, { actor: "owner", action: "workspace.style", target: name, result: level });
+        await this.deps.notify.send(
+          level === "bold"
+            ? `🔥 ${r.rows[0].name} is now BOLD: provocative, debate-starting posts with a comment call to action, still truthful and fair.`
+            : `${r.rows[0].name} is back to the standard style.`,
+        );
         return;
       }
       case "/autopilot":

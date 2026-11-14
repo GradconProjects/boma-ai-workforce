@@ -5,20 +5,22 @@
   --font-display: "Manrope", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Fraunces", ui-serif, Georgia, serif;
 
-  --color-ink-950: #07090f;
-  --color-ink-900: #0b0f19;
-  --color-ink-850: #0f1422;
-  --color-ink-800: #141a2b;
-  --color-ink-700: #1c2438;
-  --color-ink-600: #29334c;
-  --color-ink-500: #3a4663;
+  --color-ink-950: #040816;
+  --color-ink-900: #081027;
+  --color-ink-850: #0b1530;
+  --color-ink-800: #101c3d;
+  --color-ink-700: #17264d;
+  --color-ink-600: #22356a;
+  --color-ink-500: #33498a;
   --color-mist-400: #8d97b2;
   --color-mist-300: #aeb6cc;
   --color-mist-200: #d3d8e6;
   --color-mist-100: #eef1f8;
 
-  --color-amber: #f4b860;
-  --color-amber-deep: #e2953a;
+  /* "amber" is the accent token used across the app: now electric cyan */
+  --color-amber: #4cc9ff;
+  --color-amber-deep: #2aa6e8;
+  --color-violet: #8b5cf6;
   --color-coral: #ff7a6b;
   --color-iris: #8b93ff;
   --color-sage: #6fcf97;
@@ -39,15 +41,16 @@ body {
 /* Soft aurora behind the app, kept subtle so content stays primary. */
 .aurora {
   background:
-    radial-gradient(60rem 40rem at 10% -10%, rgba(139, 147, 255, 0.14), transparent 60%),
-    radial-gradient(50rem 30rem at 100% 0%, rgba(244, 184, 96, 0.1), transparent 55%),
-    radial-gradient(40rem 30rem at 50% 120%, rgba(255, 122, 107, 0.08), transparent 60%),
-    var(--color-ink-950);
+    radial-gradient(70rem 45rem at 70% -15%, rgba(76, 201, 255, 0.16), transparent 60%),
+    radial-gradient(50rem 35rem at 0% 10%, rgba(139, 92, 246, 0.16), transparent 60%),
+    radial-gradient(60rem 30rem at 60% 115%, rgba(42, 166, 232, 0.14), transparent 60%),
+    linear-gradient(180deg, #050b1f, #040816 60%);
+  background-attachment: fixed;
 }
 
 .panel {
-  background: linear-gradient(180deg, rgba(20, 26, 43, 0.82), rgba(14, 19, 32, 0.82));
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, rgba(16, 28, 61, 0.62), rgba(8, 16, 39, 0.72));
+  border: 1px solid rgba(110, 170, 255, 0.14);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.04) inset,
     0 20px 40px -24px rgba(0, 0, 0, 0.6);
@@ -58,11 +61,11 @@ body {
   @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50;
 }
 @utility btn-primary {
-  @apply btn text-ink-950;
-  background: linear-gradient(180deg, #f8c77a, #eea24a);
+  @apply btn text-white;
+  background: linear-gradient(135deg, #4cc9ff, #6d7cff 55%, #8b5cf6);
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.35) inset,
-    0 10px 24px -10px rgba(238, 162, 74, 0.7);
+    0 1px 0 rgba(255, 255, 255, 0.3) inset,
+    0 10px 28px -10px rgba(76, 201, 255, 0.75);
   &:hover:not(:disabled) {
     filter: brightness(1.06);
     transform: translateY(-1px);
@@ -126,4 +129,67 @@ body {
   background: linear-gradient(90deg, transparent, rgba(244, 184, 96, 0.18), transparent);
   background-size: 200% 100%;
   animation: shimmer 1.6s linear infinite;
+}
+
+/* ---------- futuristic touches ---------- */
+.glass {
+  background: linear-gradient(180deg, rgba(20, 36, 80, 0.45), rgba(8, 16, 39, 0.55));
+  border: 1px solid rgba(110, 170, 255, 0.18);
+  backdrop-filter: blur(16px);
+}
+.glow-ring {
+  box-shadow:
+    0 0 0 1px rgba(76, 201, 255, 0.35),
+    0 0 24px -4px rgba(76, 201, 255, 0.45),
+    0 0 60px -20px rgba(139, 92, 246, 0.6);
+}
+.text-glow {
+  background: linear-gradient(90deg, #4cc9ff, #a5b4fc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.float {
+  animation: float 5s ease-in-out infinite;
+}
+@keyframes halo {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.06);
+  }
+}
+.halo {
+  animation: halo 4s ease-in-out infinite;
+}
+@keyframes drift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.drift {
+  animation: drift 40s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .float,
+  .halo,
+  .drift {
+    animation: none;
+  }
 }

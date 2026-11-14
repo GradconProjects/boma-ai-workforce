@@ -127,6 +127,33 @@ function AttachmentChip({
   );
 }
 
+/** Slow dotted light waves behind the home screen (decorative). */
+function Waves() {
+  const dots = (y: number, amp: number, phase: number, color: string) =>
+    Array.from({ length: 160 }, (_, i) => {
+      const x = i * 12;
+      const cy = y + Math.sin(i / 9 + phase) * amp + Math.sin(i / 23) * amp * 0.6;
+      return <circle key={i} cx={x} cy={Math.round(cy * 10) / 10} r={1.4} fill={color} />;
+    });
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-x-0 bottom-0 h-[45%] overflow-hidden"
+    >
+      <div className="drift flex h-full w-[200%] opacity-70">
+        {[0, 1].map((k) => (
+          <svg key={k} viewBox="0 0 1920 300" preserveAspectRatio="none" className="h-full w-1/2">
+            {dots(200, 40, 0, "rgba(76,201,255,0.55)")}
+            {dots(230, 55, 1.6, "rgba(139,92,246,0.45)")}
+            {dots(255, 30, 3.1, "rgba(76,201,255,0.3)")}
+          </svg>
+        ))}
+      </div>
+      <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-ink-950" />
+    </div>
+  );
+}
+
 function PreviewPanel({ p, onClose }: { p: Preview; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -465,7 +492,7 @@ export function Chat({ simulation }: { simulation: boolean }) {
           setDragging(false);
           if (e.dataTransfer.files.length) upload(e.dataTransfer.files);
         }}
-        className={`relative rounded-[26px] border bg-ink-900/90 p-2 shadow-[0_8px_30px_-12px_rgba(0,0,0,0.6)] transition ${dragging ? "border-amber/60" : "border-white/10 focus-within:border-white/20"}`}
+        className={`glass relative rounded-[26px] border p-2 transition ${dragging ? "border-amber/70" : "border-amber/25 focus-within:border-amber/50"} ${empty ? "glow-ring" : "shadow-[0_8px_30px_-12px_rgba(0,0,0,0.6)]"}`}
       >
         {(files.length > 0 || uploading > 0) && (
           <div className="flex flex-wrap gap-2 px-2 pt-1 pb-2">
@@ -566,7 +593,7 @@ export function Chat({ simulation }: { simulation: boolean }) {
           <button
             type="submit"
             disabled={(!text.trim() && !files.length) || uploading > 0}
-            className="grid size-9 shrink-0 place-items-center rounded-full bg-mist-100 text-ink-950 transition hover:bg-white disabled:opacity-25"
+            className="grid size-10 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-amber to-violet text-white shadow-[0_8px_24px_-8px_rgba(76,201,255,0.8)] transition hover:brightness-110 disabled:opacity-30 disabled:shadow-none"
             aria-label="Send"
           >
             <ArrowUp className="size-[18px]" />
@@ -580,17 +607,26 @@ export function Chat({ simulation }: { simulation: boolean }) {
     <div className="flex h-full">
       <div className="flex min-w-0 flex-1 flex-col">
         {empty ? (
-          <div className="flex flex-1 flex-col items-center justify-center px-4 pb-[10vh]">
-            <h1 className="mb-6 text-center font-display text-3xl font-bold tracking-tight sm:text-4xl">
-              What can the team do for you?
+          <div className="relative flex flex-1 flex-col items-center justify-center overflow-hidden px-4 pb-[12vh]">
+            <Waves />
+            <div className="relative mb-4">
+              <div className="halo absolute inset-[-30%] rounded-full bg-[radial-gradient(circle,rgba(76,201,255,0.35),rgba(139,92,246,0.18)_45%,transparent_70%)] blur-2xl" />
+              <img
+                src="/brand/bot-hero.webp"
+                alt="Boma Bot"
+                className="float relative w-44 [mask-image:radial-gradient(closest-side,black_70%,transparent)] sm:w-52"
+              />
+            </div>
+            <h1 className="relative mb-7 text-center font-display text-3xl font-bold tracking-tight sm:text-5xl">
+              What can the <span className="text-glow">team</span> do for you?
             </h1>
-            <div className="w-full max-w-3xl">{composer}</div>
-            <div className="mt-5 flex max-w-3xl flex-wrap justify-center gap-2">
+            <div className="relative w-full max-w-3xl">{composer}</div>
+            <div className="relative mt-6 flex max-w-3xl flex-wrap justify-center gap-2.5">
               {SHORTCUTS.map(({ href, label, icon: Icon }) => (
                 <Link
                   key={href}
                   href={href}
-                  className="flex items-center gap-1.5 rounded-full border border-white/10 px-3.5 py-1.5 text-[13px] text-mist-300 transition hover:border-white/20 hover:bg-white/[0.03] hover:text-white"
+                  className="glass relative flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] text-mist-200 transition hover:border-amber/50 hover:text-white hover:shadow-[0_0_18px_-6px_rgba(76,201,255,0.7)]"
                 >
                   <Icon className="size-4" /> {label}
                 </Link>

@@ -16,6 +16,8 @@ const rulesSchema = z.object({
   claim_register: z
     .array(z.object({ id: z.string(), claim: z.string(), source: z.string() }))
     .default([]),
+  /** bold: provocative, debate-starting posts (still truthful and fair). */
+  style: z.enum(["standard", "bold"]).default("standard"),
 });
 export type WorkspaceRules = z.infer<typeof rulesSchema>;
 
@@ -58,5 +60,5 @@ export async function getWorkspaceRules(db: Queryable, slug: string): Promise<Wo
   const parsed = rulesSchema.safeParse({ name: rows[0].name, ...(rows[0].rules as object) });
   return parsed.success
     ? parsed.data
-    : { name: rows[0].name, notes: [], banned_patterns: [], claim_register: [] };
+    : { name: rows[0].name, notes: [], banned_patterns: [], claim_register: [], style: "standard" };
 }
