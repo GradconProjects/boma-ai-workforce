@@ -72,8 +72,19 @@ export async function eveningReport(
     approvals.length
       ? `Needs a decision: ${approvals.length} approval(s) — /approvals`
       : "Nothing needs a decision.",
+    (await autopilotCount(db, since))
+      ? `🤖 Autopilot approved ${await autopilotCount(db, since)} post(s) today.`
+      : "",
     budget.stopped ? "⛔ AI budget stop reached (see Spend)." : "",
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+async function autopilotCount(db: Queryable, since: Date): Promise<number> {
+  const { rows } = await db.query<{ n: number }>(
+    "select count(*)::int as n from audit_log where actor = 'policy:autopilot' and action = 'approval.approved' and result = 'approved' and created_at >= $1",
+    [since],
+  );
+  return rows[0]?.n ?? 0;
 }

@@ -76,7 +76,17 @@ export async function runTask(
   opts: RunOptions,
 ): Promise<RunResult> {
   let task = claimed;
-  const emit = async (e: TaskEvent) => opts.onEvent?.(e);
+  // A failure while announcing an event (e.g. a notification) must never retry or fail the task.
+  const emit = async (e: TaskEvent) => {
+    try {
+      await opts.onEvent?.(e);
+    } catch (err) {
+      console.error(
+        `[runner] event handler failed for ${e.type}:`,
+        err instanceof Error ? err.message : err,
+      );
+    }
+  };
   const cp: Checkpoint = task.checkpoint ?? { done: [], data: {} };
 
   try {

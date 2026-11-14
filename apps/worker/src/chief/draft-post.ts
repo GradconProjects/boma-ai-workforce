@@ -41,7 +41,15 @@ export interface DraftPostInputs {
 }
 
 type ReviewResult =
-  | { kind: "ready"; text: string; evidence: string; costAud: number }
+  | {
+      kind: "ready";
+      text: string;
+      evidence: string;
+      costAud: number;
+      /** Clean pass: score and no major/critical issues (autopilot may approve it). */
+      score?: number;
+      clean?: boolean;
+    }
   | { kind: "owner_decision"; text: string; report: string; costAud: number };
 
 const totalCost = (o: ReviewOutcome) => o.rounds.reduce((s, r) => s + r.costAud, 0);
@@ -98,6 +106,11 @@ export function draftPostHandler(deps: DraftPostDeps): TaskHandler {
                   ? "🧪 Simulated review: no AI model wrote or checked this."
                   : outcome.evidenceLine,
                 costAud: totalCost(outcome),
+                score: outcome.verdict.score,
+                clean:
+                  !deps.simulated &&
+                  outcome.verdict.issues.every((i) => i.severity === "minor") &&
+                  !outcome.verdict.injection_detected,
               } satisfies ReviewResult;
             case "injection":
               // Spec 02 §5: pause the task, alert the owner, quarantine the content (not stored).
@@ -156,6 +169,7 @@ export function draftPostHandler(deps: DraftPostDeps): TaskHandler {
                   review: r.kind === "ready" ? r.evidence : r.report,
                   simulated: Boolean(deps.simulated),
                   costAud: r.costAud,
+                  autopilot: r.kind === "ready" && r.clean ? { score: r.score ?? 0 } : null,
                 },
                 policy: deps.policy,
                 scheduledAt: validSchedule,

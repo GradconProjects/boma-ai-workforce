@@ -89,6 +89,7 @@ export async function decideApproval(
   id: string,
   decision: "approved" | "rejected",
   now = new Date(),
+  by: { actor: string; note: string } = { actor: "owner", note: "on Telegram" },
 ): Promise<DecisionResult> {
   const result = await withTx(db, async (c) => {
     const { rows } = await c.query<ApprovalRow>(
@@ -113,16 +114,18 @@ export async function decideApproval(
     return decision;
   });
   const approval = await getApproval(db, id);
+  // Task history accepts owner/system/bot actors; an owner-set rule is recorded as system.
+  const eventActor = by.actor.startsWith("policy:") ? "system" : by.actor;
   if (approval) {
     if (result === "approved")
-      await transition(db, approval.task_id, "approved", "owner", "approved on Telegram");
+      await transition(db, approval.task_id, "approved", eventActor, `approved ${by.note}`);
     if (result === "rejected")
-      await transition(db, approval.task_id, "cancelled", "owner", "rejected on Telegram");
+      await transition(db, approval.task_id, "cancelled", eventActor, `rejected ${by.note}`);
     if (result === "expired")
       await transition(db, approval.task_id, "expired", "system", "approval expired");
   }
   await audit(db, {
-    actor: "owner",
+    actor: by.actor,
     action: `approval.${decision}`,
     target: `approval:${id}`,
     result,

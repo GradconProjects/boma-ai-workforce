@@ -6,6 +6,7 @@ import { loadAllSkills, loadRepoSkills } from "@boma/skills";
 import { db, env, ROOT } from "@/lib/server";
 import { DeleteButton } from "@/components/delete-button";
 import { deleteWorkspaceAction } from "@/app/delete-actions";
+import { AutopilotSwitch } from "@/components/autopilot-switch";
 
 /** Every bot the Chief can call, what it may do, what it's connected to, and how busy it is. */
 
@@ -42,6 +43,14 @@ export default async function Bots() {
   );
   const skills = (await loadAllSkills(pool, loadRepoSkills(join(ROOT, "skills")))).filter(
     (s) => s.fm.enabled,
+  );
+  const { rows: apRows } = await pool.query<{ key: string; value: { until: string } | null }>(
+    "select key, value from system_state where key like 'autopilot:%'",
+  );
+  const autopilot = new Map(
+    apRows
+      .filter((r) => r.value && new Date(r.value.until) > new Date())
+      .map((r) => [r.key.slice("autopilot:".length), r.value!.until]),
   );
   const { rows: workspaces } = await pool.query<{ slug: string; name: string; owner_added: boolean }>(
     "select slug, name, owner_added from workspaces where owner_added or slug in ('personal','ongroundpm','mypadiforum','boma-scans') order by owner_added desc, name",
@@ -210,7 +219,8 @@ export default async function Bots() {
         <section className="panel rounded-3xl p-5 md:col-span-2">
           <h2 className="font-display font-bold">Workspaces</h2>
           <p className="mt-1 text-xs text-mist-400">
-            Businesses and pages the bots work for. Ask the Chief to create one any time.
+            Businesses and pages the bots work for. Ask the Chief to create one any time. Autopilot
+            approves clean, dual-reviewed posts for you (30 days); ads and spending always need you.
           </p>
           <ul className="mt-3 divide-y divide-white/5 text-sm">
             {workspaces.map((w) => (
@@ -221,12 +231,15 @@ export default async function Bots() {
                     {w.owner_added ? "created by you" : "built in"}
                   </span>
                 </span>
-                {w.owner_added && (
+                <span className="flex items-center gap-3">
+                  <AutopilotSwitch slug={w.slug} until={autopilot.get(w.slug) ?? null} />
+                  {w.owner_added && (
                   <DeleteButton
                     action={deleteWorkspaceAction.bind(null, w.slug)}
                     confirmText={`Delete the workspace "${w.name}"?`}
                   />
                 )}
+                </span>
               </li>
             ))}
           </ul>

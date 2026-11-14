@@ -420,4 +420,48 @@ describe.skipIf(SKIP_DB)("skills through the Chief", () => {
     await say("write something for ongroundpm");
     expect(texts()).toMatch(/couldn't finish that: upstream exploded/);
   });
+  it("autopilot approves clean reviewed posts itself; off means they come to Boma again", async () => {
+    await fx.pool.query("delete from system_state where key like 'autopilot:%'");
+    classification = { ...(classification as object), intent: "new_job" };
+    const onePost = (brief: string) => ({
+      reply: "On it.",
+      tasks: [
+        {
+          kind: "draft_post",
+          skill: null,
+          workspace: "ongroundpm",
+          brief,
+          scheduled_for: null,
+          uses_output_of: null,
+        },
+      ],
+      unsupported: [],
+      permission_changes_requested: [],
+    });
+
+    await say("autopilot ongroundpm");
+    expect(texts()).toMatch(/Autopilot is on for OnGroundPM/);
+    plan = onePost("autopilot post one");
+    await say("write a quick post about inspections");
+    await runAll();
+    const auto = await fx.pool.query(
+      "select status from tasks where kind = 'draft_post' and inputs->>'brief' = 'autopilot post one'",
+    );
+    expect(auto.rows[0].status).toBe("approved");
+    expect(texts()).not.toMatch(/Approval needed[\s\S]*autopilot post one/);
+    const audited = await fx.pool.query(
+      "select count(*)::int as n from audit_log where actor = 'policy:autopilot' and action = 'approval.approved'",
+    );
+    expect(audited.rows[0].n).toBeGreaterThan(0);
+
+    await say("/autopilot ongroundpm off");
+    expect(texts()).toMatch(/Autopilot is off for OnGroundPM/);
+    plan = onePost("manual post two");
+    await say("write another post about inspections");
+    await runAll();
+    const manual = await fx.pool.query(
+      "select status from tasks where kind = 'draft_post' and inputs->>'brief' = 'manual post two'",
+    );
+    expect(manual.rows[0].status).toBe("awaiting_approval");
+  });
 });

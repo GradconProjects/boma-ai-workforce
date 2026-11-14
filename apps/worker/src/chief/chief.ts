@@ -93,6 +93,7 @@ const HELP = [
   "/lock – lock them again",
   "/risk <name> high|standard – label a skill's risk",
   "/delete workspace <name> – remove a workspace you created",
+  "/autopilot <workspace> on|off – auto-approve clean, reviewed posts (30 days)",
 ].join("\n");
 
 export class ChiefOfStaff {
@@ -173,6 +174,8 @@ export class ChiefOfStaff {
       result: "received",
     });
     if (text.startsWith("/")) return this.command(text, messageId);
+    // "autopilot Shadow Aussie Page", "autopilot off for ongroundpm" also work without the slash.
+    if (/^\s*autopilot\b/i.test(text)) return this.command(`/${text.trim()}`, messageId);
 
     const pendingEdit = await getState<{ approvalId: string } | null>(this.deps.db, PENDING_EDIT);
     if (pendingEdit) return this.applyOwnerEdit(pendingEdit.approvalId, text, messageId);
@@ -672,12 +675,69 @@ export class ChiefOfStaff {
         });
         return;
       }
+      case "/autopilot":
+        await this.setAutopilot(args);
+        return;
       case "/risk":
         await this.setRisk(args[0]?.toLowerCase(), args[1]?.toLowerCase());
         return;
       default:
         await this.deps.notify.send(`I don't know ${cmd}. Send /help for commands.`);
     }
+  }
+
+  // ───────────────────────── autopilot ─────────────────────────
+
+  /**
+   * Owner-only (this is his own chat): pre-approve routine posts for one workspace. Every post
+   * still passes the dual review; only clean passes (score >= 85, minor issues at most) are
+   * approved automatically. Expires after 30 days. Never covers ads or spending.
+   */
+  private async setAutopilot(args: string[]): Promise<void> {
+    const words = args.filter((w) => !/^(for|on|off|the)$/i.test(w));
+    const off = args.some((w) => /^off$/i.test(w));
+    const name = words.join(" ").trim();
+    if (!name) {
+      const { rows } = await this.deps.db.query<{ key: string; value: { until: string } }>(
+        "select key, value from system_state where key like 'autopilot:%'",
+      );
+      const active = rows.filter((r) => r.value && new Date(r.value.until) > new Date());
+      await this.deps.notify.send(
+        active.length
+          ? `🤖 Autopilot is on for: ${active.map((r) => r.key.slice(10)).join(", ")}.`
+          : "🤖 Autopilot is off everywhere. Turn it on with: autopilot <workspace>",
+      );
+      return;
+    }
+    const { rows } = await this.deps.db.query<{ slug: string; name: string }>(
+      "select slug, name from workspaces where slug = $1 or lower(name) = lower($1)",
+      [name],
+    );
+    const ws = rows[0];
+    if (!ws) {
+      await this.deps.notify.send(
+        `No workspace called "${name}". Send /bots or ask me to create it.`,
+      );
+      return;
+    }
+    const until = new Date(Date.now() + 30 * 86_400_000);
+    await setState(
+      this.deps.db,
+      `autopilot:${ws.slug}`,
+      off ? null : { until: until.toISOString(), minScore: 85 },
+    );
+    await audit(this.deps.db, {
+      actor: "owner",
+      action: off ? "autopilot.off" : "autopilot.on",
+      target: ws.slug,
+      result: off ? "off" : `until ${until.toISOString()}`,
+    });
+    await this.deps.notify.send(
+      off
+        ? `🤖 Autopilot is off for ${ws.name}. Posts come to you for approval again.`
+        : `🤖 Autopilot is on for ${ws.name} until ${until.toLocaleDateString("en-AU", { timeZone: this.deps.tz })}. Clean, dual-reviewed posts are approved automatically; anything doubtful still comes to you. You'll get a summary each evening. Ads and spending always need you.`,
+    );
+    if (!off) await this.sendUnsentApprovals(); // clear eligible posts already waiting
   }
 
   // ───────────────────────── skills ─────────────────────────
@@ -859,6 +919,16 @@ export class ChiefOfStaff {
     );
     for (const { id } of rows) {
       const a = (await getApproval(this.deps.db, id))!;
+      // Autopilot: the owner pre-approved clean, dual-reviewed routine posts for this workspace.
+      const p = a.preview as { workspace?: string; autopilot?: { score: number } | null };
+      const rule = p.workspace ? await autopilotRule(this.deps.db, p.workspace) : null;
+      if (rule && p.autopilot && p.autopilot.score >= rule.minScore) {
+        const r = await decideApproval(this.deps.db, id, "approved", new Date(), {
+          actor: "policy:autopilot",
+          note: `by autopilot (${p.workspace}, score ${p.autopilot.score})`,
+        });
+        if (r === "approved") continue;
+      }
       const messageId = await this.deps.notify.send(
         approvalMessage(a, this.deps.tz),
         approvalButtons(a.id),
@@ -987,4 +1057,16 @@ export class ChiefOfStaff {
         `⌛ ${count} approval(s) expired without a decision. Ask me to redraft if you still want them.`,
       );
   }
+}
+
+/** The owner's autopilot rule for a workspace, if switched on and not expired. */
+export async function autopilotRule(
+  db: Queryable,
+  workspace: string,
+): Promise<{ minScore: number } | null> {
+  const v = await getState<{ until: string; minScore: number } | null>(
+    db,
+    `autopilot:${workspace}`,
+  );
+  return v && new Date(v.until) > new Date() ? { minScore: v.minScore ?? 85 } : null;
 }
