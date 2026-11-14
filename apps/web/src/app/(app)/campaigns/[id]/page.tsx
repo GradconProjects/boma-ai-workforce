@@ -6,6 +6,8 @@ import { getBrand, getCampaign } from "@boma/studio";
 import { DesignView } from "@/components/design-view";
 import { db } from "@/lib/server";
 import { CampaignActions, ExportAllButton, ItemDecision, LiveRefresh } from "./client";
+import { DeleteButton } from "@/components/delete-button";
+import { deleteCampaignAction } from "@/app/delete-actions";
 
 const COPY_STATUS: Record<string, { label: string; cls: string }> = {
   none: { label: "No copy yet", cls: "bg-white/5 text-mist-300" },
@@ -62,6 +64,11 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
           <CampaignActions campaignId={campaign.id} />
           <ExportAllButton
             designs={items.map((i) => ({ doc: i.design.doc, title: i.design.title }))}
+          />
+          <DeleteButton
+            action={deleteCampaignAction.bind(null, campaign.id)}
+            label="Delete campaign"
+            confirmText="Delete this campaign and its designs? This can't be undone."
           />
         </div>
       </header>

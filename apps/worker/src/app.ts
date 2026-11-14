@@ -57,13 +57,14 @@ export function modelsFromEnv(env: Env) {
     provider: "anthropic",
     model: need(env.ANTHROPIC_MODEL_CHEAP, "ANTHROPIC_MODEL_CHEAP"),
   };
+  const on = (v?: string) => (v && !/^(off|none|disabled)$/i.test(v) ? v : undefined);
   const deepseek: ModelRef | undefined =
-    env.DEEPSEEK_API_KEY && env.DEEPSEEK_MODEL
-      ? { provider: "deepseek", model: env.DEEPSEEK_MODEL }
+    env.DEEPSEEK_API_KEY && on(env.DEEPSEEK_MODEL)
+      ? { provider: "deepseek", model: env.DEEPSEEK_MODEL! }
       : undefined;
   const openaiReasoning: ModelRef | undefined =
-    env.OPENAI_API_KEY && env.OPENAI_MODEL_REASONING
-      ? { provider: "openai", model: env.OPENAI_MODEL_REASONING }
+    env.OPENAI_API_KEY && on(env.OPENAI_MODEL_REASONING)
+      ? { provider: "openai", model: env.OPENAI_MODEL_REASONING! }
       : undefined;
 
   const cheap = deepseek ?? claudeCheap;

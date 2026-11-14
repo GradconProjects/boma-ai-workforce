@@ -5,6 +5,8 @@ import type { BotFrontmatter } from "@boma/bots";
 import { budgetStatus } from "@boma/core";
 import { loadAllSkills, loadRepoSkills } from "@boma/skills";
 import { db, env, policy, ROOT } from "@/lib/server";
+import { DeleteButton } from "@/components/delete-button";
+import { deleteWorkspaceAction } from "@/app/delete-actions";
 
 /** Every bot the Chief can call, what it may do, what it's connected to, and how busy it is. */
 
@@ -43,6 +45,9 @@ export default async function Bots() {
     (s) => s.fm.enabled,
   );
   const budget = await budgetStatus(pool, policy());
+  const { rows: workspaces } = await pool.query<{ slug: string; name: string; owner_added: boolean }>(
+    "select slug, name, owner_added from workspaces where owner_added or slug in ('personal','ongroundpm','mypadiforum','boma-scans') order by owner_added desc, name",
+  );
   const e = env();
 
   const connections = [
@@ -201,6 +206,30 @@ export default async function Bots() {
                   <span className="block text-xs text-mist-400">{c.note}</span>
                 </span>
                 <span className="text-xs text-mist-400">{c.ok ? "connected" : "not set"}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section className="panel rounded-3xl p-5 md:col-span-2">
+          <h2 className="font-display font-bold">Workspaces</h2>
+          <p className="mt-1 text-xs text-mist-400">
+            Businesses and pages the bots work for. Ask the Chief to create one any time.
+          </p>
+          <ul className="mt-3 divide-y divide-white/5 text-sm">
+            {workspaces.map((w) => (
+              <li key={w.slug} className="flex items-center justify-between gap-3 py-2">
+                <span>
+                  {w.name}
+                  <span className="ml-2 text-xs text-mist-400">
+                    {w.owner_added ? "created by you" : "built in"}
+                  </span>
+                </span>
+                {w.owner_added && (
+                  <DeleteButton
+                    action={deleteWorkspaceAction.bind(null, w.slug)}
+                    confirmText={`Delete the workspace "${w.name}"?`}
+                  />
+                )}
               </li>
             ))}
           </ul>

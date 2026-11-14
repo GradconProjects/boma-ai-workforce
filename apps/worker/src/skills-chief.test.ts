@@ -349,4 +349,75 @@ describe.skipIf(SKIP_DB)("skills through the Chief", () => {
     expect(inAsked.some((t) => t.includes("SKILL ANSWER"))).toBe(true);
     expect(inLater.some((t) => t.includes("SKILL ANSWER"))).toBe(false);
   });
+  it("creates a workspace Boma names, and plans work in it straight away", async () => {
+    classification = { ...(classification as object), intent: "new_job" };
+    plan = {
+      reply: "Done: I've set up Shadow Aussie Page and drafted the first post.",
+      tasks: [
+        {
+          kind: "draft_post",
+          skill: null,
+          workspace: "Shadow Aussie Page",
+          brief: "Welcome post for an Australian everything blog",
+          scheduled_for: null,
+          uses_output_of: null,
+        },
+      ],
+      new_workspaces: [
+        {
+          name: "Shadow Aussie Page",
+          description: "Blog and Facebook page about everything Australian",
+        },
+        { name: "Sneaky Crypto Pump", description: "not requested" },
+      ],
+      unsupported: [],
+      permission_changes_requested: [],
+    };
+    await say("Set up my Shadow Aussie Page and write the first Facebook post for it");
+    expect(texts()).toMatch(/Created the workspace "Shadow Aussie Page"/);
+    expect(texts()).toMatch(/didn't create "Sneaky Crypto Pump"/);
+    const ws = await fx.pool.query(
+      "select slug, owner_added from workspaces where slug = 'shadow-aussie-page'",
+    );
+    expect(ws.rows[0]).toEqual({ slug: "shadow-aussie-page", owner_added: true });
+    expect(
+      (
+        await fx.pool.query(
+          "select count(*)::int as n from workspaces where slug = 'sneaky-crypto-pump'",
+        )
+      ).rows[0].n,
+    ).toBe(0);
+    const task = await fx.pool.query(
+      "select t.kind from tasks t join workspaces w on w.id = t.workspace_id where w.slug = 'shadow-aussie-page' and t.status <> 'cancelled'",
+    );
+    expect(task.rows.map((r) => r.kind)).toContain("draft_post");
+  });
+
+  it("reads the conversation so a follow-up like 'do it' makes sense", async () => {
+    const conv = "44444444-4444-4444-8444-444444444444";
+    await logChat(fx.pool, {
+      role: "owner",
+      channel: "app",
+      text: "I want a blog about everything Australian, linked to my Facebook page",
+      clientId: "client-hist-1",
+      conversationId: conv,
+    });
+    await logChat(fx.pool, {
+      role: "owner",
+      channel: "app",
+      text: "do it",
+      clientId: "client-hist-2",
+      conversationId: conv,
+    });
+    await chief.onOwnerMessage("do it", -1);
+    const call = anthropic.calls.find((c) => c.schemaName === "classification")!;
+    expect(call.input).toContain("blog about everything Australian");
+    expect(call.input).toMatch(/Newest message from Boma:\ndo it$/);
+  });
+
+  it("always answers, even when something breaks", async () => {
+    anthropic.setHandler(() => ({ error: new Error("upstream exploded") }));
+    await say("write something for ongroundpm");
+    expect(texts()).toMatch(/couldn't finish that: upstream exploded/);
+  });
 });

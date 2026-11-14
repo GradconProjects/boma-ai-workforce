@@ -4,6 +4,8 @@ import { ArrowLeft } from "lucide-react";
 import { getRun } from "@boma/skills";
 import { db } from "@/lib/server";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { DeleteButton } from "@/components/delete-button";
+import { deleteSkillRunAction } from "@/app/delete-actions";
 
 const UUID = /^[0-9a-f-]{36}$/i;
 
@@ -16,9 +18,15 @@ export default async function SkillRun({ params }: { params: Promise<{ id: strin
   return (
     <div className="mx-auto max-w-4xl px-6 py-8 lg:px-10">
       {working && <AutoRefresh seconds={4} />}
-      <Link href="/skills" className="btn-ghost -ml-3 px-3 text-mist-400">
-        <ArrowLeft className="size-4" /> Skills
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link href="/skills" className="btn-ghost -ml-3 px-3 text-mist-400">
+          <ArrowLeft className="size-4" /> Skills
+        </Link>
+        <DeleteButton
+          action={deleteSkillRunAction.bind(null, run.id)}
+          confirmText="Delete this skill answer?"
+        />
+      </div>
       <div className="mt-4 text-xs font-semibold tracking-[0.2em] text-amber uppercase">
         {run.slug}
       </div>

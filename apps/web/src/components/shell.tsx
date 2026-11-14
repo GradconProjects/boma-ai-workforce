@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Archive,
+  Trash2,
   Bot,
   Brain,
   CheckCircle2,
@@ -183,6 +184,26 @@ function RecentItem({ r, active, onChange }: { r: Recent; active: boolean; onCha
             onClick={() => patch({ archived: true })}
           >
             <Archive className="size-3.5" /> Archive
+          </button>
+          <button
+            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-coral hover:bg-white/5"
+            onClick={async () => {
+              if (!confirm(`Delete "${r.title}" permanently?`)) return setMenu(false);
+              setMenu(false);
+              await fetch("/api/chat/conversations", {
+                method: "DELETE",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ id: r.id }),
+              }).catch(() => undefined);
+              try {
+                localStorage.removeItem(`boma-chat-v2:${r.id}`);
+              } catch {
+                /* ignore */
+              }
+              onChange();
+            }}
+          >
+            <Trash2 className="size-3.5" /> Delete
           </button>
         </div>
       )}

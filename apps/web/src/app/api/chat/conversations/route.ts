@@ -13,6 +13,15 @@ export async function GET(req: Request) {
   return NextResponse.json({ conversations: await listConversations(db(), { search, limit: 80 }) });
 }
 
+export async function DELETE(req: Request) {
+  if (!(await isOwner())) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
+  const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!isUuid(b.id)) return NextResponse.json({ error: "Bad request" }, { status: 400 });
+  // Messages go with the conversation (on delete cascade).
+  await db().query("delete from chat_conversations where id = $1", [b.id]);
+  return NextResponse.json({ ok: true });
+}
+
 export async function PATCH(req: Request) {
   if (!(await isOwner())) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
   const b = (await req.json().catch(() => ({}))) as Record<string, unknown>;

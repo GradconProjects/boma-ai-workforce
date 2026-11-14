@@ -1,5 +1,6 @@
 import {
   audit,
+  redact,
   budgetStatus,
   BudgetBlockedError,
   createTask,
@@ -60,6 +61,14 @@ const PENDING_CLARIFICATION = "chief:pending_clarification";
 const PENDING_EDIT = "chief:pending_edit";
 const PENDING_SKILL = "chief:pending_skill";
 
+const LOYAL = [
+  "You work for Boma, the business owner. You are his loyal Chief of Staff.",
+  "Act on his instructions straight away. Never argue, lecture or make him repeat himself.",
+  "If a detail is missing, choose the most sensible option, say what you assumed, and get on with it.",
+  "Use the conversation so far: a short message like 'do it' or 'that page' refers to what was just discussed.",
+  "Bring in the right skills and bots yourself; he should not have to name them.",
+].join("\n");
+
 /** Never store a typed passcode (audit log, chat history). */
 export const redactPasscode = (text: string) =>
   /^\/unlock\b/i.test(text.trim()) ? "/unlock ••••••" : text;
@@ -83,6 +92,7 @@ const HELP = [
   "/unlock <passcode> – unlock high-risk skills for 30 minutes",
   "/lock – lock them again",
   "/risk <name> high|standard – label a skill's risk",
+  "/delete workspace <name> – remove a workspace you created",
 ].join("\n");
 
 export class ChiefOfStaff {
@@ -102,7 +112,7 @@ export class ChiefOfStaff {
       policy: this.deps.policy,
       bot: {
         slug: bot.slug,
-        workspaces: bot.frontmatter.workspaces,
+        workspaces: await this.workspaceSlugs(bot),
         accounts: bot.frontmatter.accounts,
         actions: bot.frontmatter.actions,
       },
@@ -111,6 +121,46 @@ export class ChiefOfStaff {
       workspace,
       paused: await isPaused(this.deps.db),
     });
+  }
+
+  /** Workspaces the Chief may use: its own list plus any the owner created in chat. */
+  private async workspaceSlugs(bot?: BotSettings): Promise<string[]> {
+    const b = bot ?? (await this.bot());
+    const { rows } = await this.deps.db.query<{ slug: string }>(
+      "select slug from workspaces where owner_added",
+    );
+    return [...new Set([...b.frontmatter.workspaces, ...rows.map((r) => r.slug)])];
+  }
+
+  /**
+   * The recent conversation (newest owner message excluded: that is the request itself), so
+   * "do it" or "that page" make sense. Owner and Chief messages only; attachments stay out.
+   */
+  private async history(): Promise<{ text: string; ownerText: string }> {
+    try {
+      const { rows } = await this.deps.db.query<{ role: string; text: string }>(
+        `with c as (select conversation_id from chat_messages where role = 'owner' order by id desc limit 1)
+         select role, text from (
+           select m.id, m.role, m.text from chat_messages m, c
+            where m.conversation_id = c.conversation_id order by m.id desc limit 15
+         ) x order by id`,
+      );
+      if (rows.at(-1)?.role === "owner") rows.pop();
+      const lines = rows.map(
+        (r) =>
+          `${r.role === "owner" ? "Boma" : "You"}: ${r.text.replace(/\s+/g, " ").slice(0, 500)}`,
+      );
+      return {
+        text: lines.length ? `Conversation so far:\n${lines.join("\n")}\n\n` : "",
+        ownerText: rows
+          .filter((r) => r.role === "owner")
+          .map((r) => r.text)
+          .join("\n")
+          .toLowerCase(),
+      };
+    } catch {
+      return { text: "", ownerText: "" }; // no chat history table (older test databases)
+    }
   }
 
   // ───────────────────────── owner messages ─────────────────────────
@@ -151,7 +201,17 @@ export class ChiefOfStaff {
         );
         return;
       }
-      throw err;
+      // Never leave the owner without an answer.
+      const reason = redact(err instanceof Error ? err.message : String(err)).slice(0, 300);
+      await audit(this.deps.db, {
+        actor: "bot:chief-of-staff",
+        action: "chief.error",
+        inputs: redactPasscode(text).slice(0, 500),
+        result: reason,
+      });
+      await this.deps.notify.send(
+        `⚠️ I couldn't finish that: ${reason}\nI've logged it. Send it again in a moment, or tell me another way to do it.`,
+      );
     }
   }
 
@@ -210,12 +270,14 @@ export class ChiefOfStaff {
     skills: Skill[] = [],
   ): Promise<Classification> {
     const system = [
-      "You classify messages from the business owner to his Chief of Staff bot.",
-      "intent: new_job (asks for work to be done, e.g. write or prepare content), question (asks for information about the system or its work), control (pause, resume, status, budget, approvals, bots), bot_edit (wants a bot's behaviour or permissions changed), approval (about approving or rejecting something), unclear (cannot tell what is wanted, or a required detail like which business is missing).",
-      "Workspaces (businesses): ongroundpm, boma-scans, mypadiforum, personal.",
+      LOYAL,
+      "Classify the owner's newest message.",
+      "intent: new_job (any work: writing, planning, research, creating a page/blog/workspace, posting, a campaign), question (asks about the system or its work), control (pause, resume, status, budget, approvals, bots), bot_edit (wants a bot's behaviour or permissions changed), approval (about approving or rejecting something), unclear (ONLY if the message has no actionable meaning even with the conversation, e.g. a single stray character).",
+      "Almost everything is new_job. A missing detail is NOT unclear: the planner will choose sensibly.",
+      `Existing workspaces: ${(await this.workspaceSlugs(bot)).join(", ")}. A business, page or project he names that isn't listed will be created: that is still new_job.`,
       alreadyClarified
-        ? "The owner has already answered one clarifying question. Do not ask another: choose the most reasonable interpretation."
-        : "If intent is unclear, write exactly one short clarifying question.",
+        ? "He has already answered one clarifying question. Do not ask another."
+        : "If (and only if) intent is unclear, write one short clarifying question.",
       ...(skills.length
         ? [
             "Skills library (expert methods that apply to ANY topic of their kind, not only the examples in their descriptions):",
@@ -229,7 +291,7 @@ export class ChiefOfStaff {
       {
         model: this.deps.models.cheap.model,
         system,
-        input: request,
+        input: `${(await this.history()).text}Newest message from Boma:\n${request}`,
         maxOutputTokens: 600,
         schema: classifySchema,
         schemaName: "classification",
@@ -246,12 +308,14 @@ export class ChiefOfStaff {
   }
 
   private async planAndDispatch(request: string, messageId: number, bot: BotSettings) {
-    const fm = bot.frontmatter;
+    const workspaces = await this.workspaceSlugs(bot);
+    const hist = await this.history();
     const skillCatalogue = (await this.enabledSkills()).map(
       (s) => `- ${s.fm.slug}: ${s.fm.description.slice(0, 160)}`,
     );
     const system = [
-      "You are the business owner's Chief of Staff. Turn the request into a plan of tasks for the available bots.",
+      LOYAL,
+      "Turn his newest message (read with the conversation so far) into a plan of tasks for the bots, and act now.",
       "Available task kinds:",
       "- draft_post: draft one Facebook Page post for a workspace (it is reviewed and sent to the owner for approval; nothing is published by this task). One task per post.",
       "- skill_run: ask one expert skill from the library (set `skill` to its slug; `brief` is the full question). Its answer goes to the owner.",
@@ -259,19 +323,21 @@ export class ChiefOfStaff {
         ? ["Skills library:", ...skillCatalogue]
         : ["(No skills are available: do not plan skill_run.)"]),
       "Teamwork: when a post should build on a skill's answer (e.g. research or a strategy first, then posts), plan the skill_run first and set the draft_post's uses_output_of to the skill_run's index (0-based) in tasks. Otherwise uses_output_of is null. skill is null for draft_post.",
-      `Workspaces you may use: ${fm.workspaces.join(", ")}.`,
-      "If part of the request needs something no task kind covers (sending email, posting directly, spending money, other platforms), list it in `unsupported`.",
+      "Be proactive: for anything about a page, blog, brand, audience, content or marketing, start with the content-strategist skill (or another fitting skill), then plan draft_post tasks that use its output. Plan several posts when that makes sense.",
+      `Existing workspaces: ${workspaces.join(", ")}.`,
+      "If he names a business, page, blog or project that is not an existing workspace, add it to new_workspaces (name exactly as he said it, plus a one-line description) and use its name as the workspace for its tasks. Never refuse because a workspace is missing.",
+      "Do every part you can. Only list in `unsupported` what the system genuinely cannot do yet (for example: publishing live to Facebook before the Page is connected, building a website, sending email, spending money), and still plan the drafts and strategy for it.",
       "If the request asks to change any bot's permissions, tools, accounts, autonomy level or budget, list it in `permission_changes_requested` and do not plan tasks for it.",
       "scheduled_for: ISO 8601 date-time with Australia/Sydney offset if the owner gave a time, else null.",
-      "reply: one or two friendly sentences to the owner summarising the plan, in Australian English.",
+      "reply: one or two confident sentences to Boma saying what you are doing now, in Australian English. State any assumption you made.",
     ].join("\n");
     const r = await this.deps.llm.call(
       this.deps.models.planner.provider,
       {
         model: this.deps.models.planner.model,
         system,
-        input: request,
-        maxOutputTokens: 2000,
+        input: `${hist.text}Newest message from Boma:\n${request}`,
+        maxOutputTokens: 3000,
         schema: planSchema,
         schemaName: "plan",
         effort: "medium",
@@ -286,6 +352,49 @@ export class ChiefOfStaff {
     );
     const plan = r.parsed;
     const lines: string[] = [];
+
+    // Workspaces he asked for: created only if HE named them (in this message or earlier in the
+    // conversation), never from attached or quoted content.
+    const ownerWords = `${request.split(/\n\nAttached file /)[0]}\n${hist.ownerText}`.toLowerCase();
+    const byName = new Map<string, string>();
+    for (const w of plan.new_workspaces ?? []) {
+      const name = w.name.trim().slice(0, 80);
+      const slug = name
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 40);
+      if (!name || !slug) continue;
+      if (!ownerWords.includes(name.toLowerCase())) {
+        lines.push(`🚫 I didn't create "${name}": you didn't name it yourself.`);
+        continue;
+      }
+      const created = await this.deps.db.query(
+        `insert into workspaces (slug, name, rules, owner_added) values ($1, $2, $3, true)
+         on conflict (slug) do update set owner_added = true returning (xmax = 0) as inserted`,
+        [slug, name, { name, notes: [w.description.slice(0, 300)] }],
+      );
+      await audit(this.deps.db, {
+        actor: "owner",
+        action: "workspace.create",
+        target: slug,
+        inputs: { name, description: w.description },
+        result: "created on the owner's instruction",
+      });
+      byName.set(name.toLowerCase(), slug);
+      if ((created.rows[0] as { inserted?: boolean } | undefined)?.inserted)
+        lines.push(`🆕 Created the workspace "${name}".`);
+    }
+    // Tasks may name a workspace by its display name; map it to its slug.
+    const named = await this.deps.db.query<{ slug: string; name: string }>(
+      "select slug, name from workspaces",
+    );
+    for (const ws of named.rows) byName.set(ws.name.toLowerCase(), ws.slug);
+    for (const t of plan.tasks) {
+      const key = t.workspace.trim().toLowerCase();
+      if (!(await this.workspaceSlugs(bot)).includes(t.workspace))
+        t.workspace = byName.get(key) ?? t.workspace;
+    }
 
     // C7: permission changes are owner-only. The LLM can only report the request; code denies it.
     for (const change of plan.permission_changes_requested) {
@@ -517,6 +626,52 @@ export class ChiefOfStaff {
         await lockSkills(db);
         await this.deps.notify.send("🔒 High-risk skills are locked again.");
         return;
+      case "/delete": {
+        const what = args[0]?.toLowerCase();
+        const name = args.slice(1).join(" ").trim();
+        if (what !== "workspace" || !name) {
+          await this.deps.notify.send(
+            "Usage: /delete workspace <name>. Conversations, drafts, skill answers and campaigns have Delete buttons in the app.",
+          );
+          return;
+        }
+        const { rows } = await db.query<{
+          id: string;
+          slug: string;
+          name: string;
+          owner_added: boolean;
+        }>(
+          "select id, slug, name, owner_added from workspaces where slug = $1 or lower(name) = lower($1)",
+          [name],
+        );
+        const ws = rows[0];
+        if (!ws) {
+          await this.deps.notify.send(`No workspace called "${name}".`);
+          return;
+        }
+        if (!ws.owner_added) {
+          await this.deps.notify.send(
+            `"${ws.name}" is built in; it's changed in config/workspaces.yaml.`,
+          );
+          return;
+        }
+        try {
+          await db.query("delete from workspaces where id = $1", [ws.id]);
+          await this.deps.notify.send(`🗑 Deleted the workspace "${ws.name}".`);
+        } catch {
+          await db.query("update workspaces set owner_added = false where id = $1", [ws.id]);
+          await this.deps.notify.send(
+            `🗑 Retired "${ws.name}": it has work history, so it's hidden from now on instead of erased.`,
+          );
+        }
+        await audit(db, {
+          actor: "owner",
+          action: "workspace.delete",
+          target: ws.slug,
+          result: "done",
+        });
+        return;
+      }
       case "/risk":
         await this.setRisk(args[0]?.toLowerCase(), args[1]?.toLowerCase());
         return;

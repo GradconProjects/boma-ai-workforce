@@ -29,6 +29,11 @@ export const planSchema = z.object({
   ),
   /** Parts of the request no available bot can do yet. */
   unsupported: z.array(z.string()),
+  /** New workspaces (businesses, pages, projects) the owner asked for by name. */
+  new_workspaces: z
+    .array(z.object({ name: z.string(), description: z.string() }))
+    .optional()
+    .default([]),
   /** Any request to change a bot's permissions, tools, accounts, autonomy or budget. */
   permission_changes_requested: z.array(z.string()),
 });
