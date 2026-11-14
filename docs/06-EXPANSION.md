@@ -53,6 +53,25 @@ available. From Parts 1–3 it asks for:
 - Rules that match ours: build first, no deployment or charges without explicit authorisation,
   under A$50/month excluding ad spend, Australian English.
 
+### Existing Creative Studio v1.0 prototype (assessed 14 Nov 2026)
+
+Kept unchanged in `legacy/creative-studio-v1/` as the porting reference (excluded from lint/format).
+
+| Area | What it has | Keep / replace |
+|---|---|---|
+| Brand kits | name, tagline, industry, audience, tone, 3 colours, logo text, feature list | **Keep** the model; move to a `brands` table per workspace |
+| Formats | flyer (A4), social (square), story (9:16), advert (wide), document, video storyboard | **Keep** as the first format catalogue |
+| Content model | eyebrow, headline, subhead, CTA, footer, bullets, body, scenes with durations | **Keep** as the starting schema; add layers and version history |
+| Campaign builder | one brief → five coordinated projects | **Keep** the flow; drafts go through the Chief + dual review instead of fixed templates |
+| Rendering/export | canvas previews, PNG export, print-to-PDF, TXT, silent WebM storyboard (MediaRecorder) | **Port** the canvas drawing to a tested `design-engine` package |
+| Persistence | browser localStorage + JSON backup/restore | **Replace** with Postgres/Supabase + storage; keep JSON import so v1 backups can be migrated |
+| Code | ~30 KB single minified `app.js`, HTML strings via `innerHTML` with an escape helper, no tests | **Replace** with React components and tests |
+| AI | none (local sample headlines) | **Replace** with the budget gateway + dual review |
+| Accounts/auth | none | **Add** owner login and workspace isolation |
+
+Starter brand data (Concrete Estimating Platform, Cynthus Collections) is reference content; claims
+need the owner's confirmation before use (it becomes those workspaces' claim registers).
+
 ### Conflicts and risks to settle
 
 | Topic | Existing spec | Master prompt | Note |
