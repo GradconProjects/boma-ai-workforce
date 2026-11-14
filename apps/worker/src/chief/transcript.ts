@@ -191,9 +191,15 @@ export async function describeAttachments(db: Queryable, list: Attachment[]): Pr
 /** Wrap the Telegram (or console) notifier so every Chief message is also kept in the chat. */
 export function withTranscript(db: Queryable, inner: Notifier): Notifier {
   return {
-    async send(text, buttons) {
+    async send(text, buttons, opts) {
       try {
-        await logChat(db, { role: "chief", channel: "app", text, buttons });
+        await logChat(db, {
+          role: "chief",
+          channel: "app",
+          text,
+          buttons,
+          conversationId: isUuid(opts?.conversationId) ? opts!.conversationId! : undefined,
+        });
       } catch (err) {
         console.error("chat log failed:", (err as Error).message);
       }

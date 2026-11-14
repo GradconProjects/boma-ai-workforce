@@ -5,6 +5,7 @@ import { MockProvider, PriceTable, type LlmRequest } from "@boma/llm";
 import { repoPath, setupDb, SKIP_DB, type Fixture } from "../../../test/fixture";
 import { buildApp } from "./app";
 import { chunkForTelegram } from "./chief/skill-run";
+import { chatHistory, logChat, withTranscript } from "./chief/transcript";
 import type { Notifier } from "./chief/notifier";
 import { Worker } from "./worker";
 import { loadWorkspaceConfig, syncWorkspaces } from "./workspaces";
@@ -48,6 +49,7 @@ describe.skipIf(SKIP_DB)("skills through the Chief", () => {
   let anthropic: MockProvider;
   let classification: unknown;
   let plan: unknown;
+  let chief: Awaited<ReturnType<typeof buildApp>>["chief"];
   let msgId = 5000;
 
   const say = (text: string) =>
@@ -106,11 +108,11 @@ describe.skipIf(SKIP_DB)("skills through the Chief", () => {
           },
     );
     tg = new MockTelegramApi();
-    const notify: Notifier = {
+    const notify: Notifier = withTranscript(fx.pool, {
       send: (t, b) => tg.sendMessage(OWNER, t, b),
       edit: (id, t) => tg.editMessage(OWNER, id, t),
       deleteOwnerMessage: (id) => tg.deleteMessage(OWNER, id),
-    };
+    });
     const app = await buildApp({
       db: fx.pool,
       policy: fx.policy,
@@ -120,6 +122,7 @@ describe.skipIf(SKIP_DB)("skills through the Chief", () => {
       providers: { anthropic, openai },
       skillsDir: repoPath("skills"),
     });
+    chief = app.chief;
     gateway = new TelegramGateway(tg, fx.pool, OWNER, {
       onMessage: (t, id) => app.chief.onOwnerMessage(t, id),
       onApprovalButton: (a, act) => app.chief.onApprovalButton(a, act),
@@ -320,5 +323,30 @@ describe.skipIf(SKIP_DB)("skills through the Chief", () => {
       "select count(*)::int as n from tasks t join tasks p on p.id = t.parent_task_id where p.inputs->>'request' = 'angles?'",
     );
     expect(kids.rows[0].n).toBe(0);
+  });
+  it("a late skill answer lands in the app conversation it was asked in", async () => {
+    const asked = "11111111-1111-4111-8111-111111111111";
+    const later = "22222222-2222-4222-8222-222222222222";
+    const m = await logChat(fx.pool, {
+      role: "owner",
+      channel: "app",
+      text: "council this: lease or buy the ute?",
+      clientId: "client-late-1",
+      conversationId: asked,
+    });
+    await chief.onOwnerMessage("council this: lease or buy the ute?", -Number(m.id));
+    // The owner moves on to another conversation before the answer is ready.
+    await logChat(fx.pool, {
+      role: "owner",
+      channel: "app",
+      text: "something else",
+      clientId: "client-late-2",
+      conversationId: later,
+    });
+    await runAll();
+    const inAsked = (await chatHistory(fx.pool, { conversationId: asked })).map((x) => x.text);
+    const inLater = (await chatHistory(fx.pool, { conversationId: later })).map((x) => x.text);
+    expect(inAsked.some((t) => t.includes("SKILL ANSWER"))).toBe(true);
+    expect(inLater.some((t) => t.includes("SKILL ANSWER"))).toBe(false);
   });
 });

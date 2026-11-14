@@ -364,6 +364,7 @@ export class ChiefOfStaff {
           idempotencyKey: `tg:${messageId}:${t.index}`,
           actor: "bot:chief-of-staff",
           handoff,
+          conversationId: await this.conversationOf(messageId),
         });
         if (!r.ok) {
           lines.push(
@@ -558,6 +559,16 @@ export class ChiefOfStaff {
   }
 
   /** Queue a skill run after the code checks (enabled, pause, passcode, budget). */
+  /** The app conversation an owner message came from (app messages have negative ids). */
+  private async conversationOf(messageId: number): Promise<string | null> {
+    if (messageId >= 0) return null;
+    const { rows } = await this.deps.db.query<{ conversation_id: string | null }>(
+      "select conversation_id from chat_messages where id = $1",
+      [-messageId],
+    );
+    return rows[0]?.conversation_id ?? null;
+  }
+
   private async runSkill(skill: Skill, request: string, messageId: number): Promise<void> {
     const r = await dispatchSkill(this.deps.db, this.deps.policy, {
       skill,
@@ -565,6 +576,7 @@ export class ChiefOfStaff {
       channel: "telegram",
       idempotencyKey: `tg:${messageId}:skill`,
       actor: "owner",
+      conversationId: await this.conversationOf(messageId),
     });
     if (r.ok) {
       if (!r.duplicate)

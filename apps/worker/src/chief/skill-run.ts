@@ -35,6 +35,7 @@ export interface SkillRunInputs {
   channel: "web" | "telegram";
   /** Follow-up steps for other bots, planned by the Chief, that build on this answer. */
   handoff?: Handoff[];
+  conversation_id?: string;
 }
 
 export interface Handoff {
@@ -102,6 +103,7 @@ export function skillRunHandler(deps: SkillRunDeps): TaskHandler {
         name: "run",
         run: async (ctx) => {
           const i = ctx.task.inputs as unknown as SkillRunInputs;
+          const where = { conversationId: i.conversation_id ?? null };
           const skill = await findSkill(deps.db, deps.skillsDir, i.slug);
           if (!skill) {
             await finishRun(deps.db, i.run_id, { error: `Skill "${i.slug}" no longer exists` });
@@ -174,11 +176,13 @@ export function skillRunHandler(deps: SkillRunDeps): TaskHandler {
           if (i.channel === "telegram") {
             const { chunks, truncated } = chunkForTelegram(output);
             for (const [n, c] of chunks.entries()) {
-              await deps.notify.send(n === 0 ? `🧠 ${skill.fm.name}\n\n${c}` : c);
+              await deps.notify.send(n === 0 ? `🧠 ${skill.fm.name}\n\n${c}` : c, undefined, where);
             }
             if (truncated) {
               await deps.notify.send(
                 `…the full answer is in the web app under Skills${deps.appUrl ? `: ${deps.appUrl}/skills/runs/${i.run_id}` : "."}`,
+                undefined,
+                where,
               );
             }
           }
@@ -192,6 +196,8 @@ export function skillRunHandler(deps: SkillRunDeps): TaskHandler {
           if (handedTo.length) {
             await deps.notify.send(
               `🤝 ${skill.fm.name} handed its answer to the post drafter: ${handedTo.join(", ")}. Drafts come back for your approval.`,
+              undefined,
+              where,
             );
           }
           return { run_id: i.run_id, costAud: cost, handed_to: handedTo };

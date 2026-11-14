@@ -2,7 +2,12 @@ import type { InlineButton } from "@boma/connectors";
 
 /** How the Chief reaches the owner. Telegram in production; a recorder in tests/simulation. */
 export interface Notifier {
-  send(text: string, buttons?: InlineButton[][]): Promise<number>;
+  /** `conversationId` files the message in a specific app conversation (default: the latest). */
+  send(
+    text: string,
+    buttons?: InlineButton[][],
+    opts?: { conversationId?: string | null },
+  ): Promise<number>;
   edit(messageId: number, text: string): Promise<void>;
   /** Remove one of the owner's own messages (e.g. a typed passcode). Optional. */
   deleteOwnerMessage?(messageId: number): Promise<void>;

@@ -36,6 +36,8 @@ export async function dispatchSkill(
     /** Follow-up work for other bots once this skill has answered (Chief-led teamwork). */
     handoff?: unknown[];
     workspace?: string | null;
+    /** App conversation the answer belongs to (so a late answer lands where it was asked). */
+    conversationId?: string | null;
   },
 ): Promise<DispatchResult> {
   const { skill } = o;
@@ -80,6 +82,7 @@ export async function dispatchSkill(
       request: o.request,
       channel: o.channel,
       ...(o.handoff?.length ? { handoff: o.handoff } : {}),
+      ...(o.conversationId ? { conversation_id: o.conversationId } : {}),
     },
     idempotencyKey: o.idempotencyKey,
     estCostAud: estimateAud,
