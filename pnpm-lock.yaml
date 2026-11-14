@@ -74,6 +74,9 @@ importers:
       '@boma/design-engine':
         specifier: workspace:*
         version: link:../../packages/design-engine
+      '@boma/skills':
+        specifier: workspace:*
+        version: link:../../packages/skills
       '@boma/studio':
         specifier: workspace:*
         version: link:../../packages/studio
@@ -135,6 +138,9 @@ importers:
       '@boma/review':
         specifier: workspace:*
         version: link:../../packages/review
+      '@boma/skills':
+        specifier: workspace:*
+        version: link:../../packages/skills
       '@boma/studio':
         specifier: workspace:*
         version: link:../../packages/studio
@@ -225,6 +231,18 @@ importers:
       '@boma/llm':
         specifier: workspace:*
         version: link:../llm
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
+  packages/skills:
+    dependencies:
+      '@boma/core':
+        specifier: workspace:*
+        version: link:../core
+      yaml:
+        specifier: 2.9.1
+        version: 2.9.1
       zod:
         specifier: 4.6.7
         version: 4.6.7

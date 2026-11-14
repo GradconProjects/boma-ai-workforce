@@ -83,6 +83,7 @@ async function main() {
     ? {
         send: (text, buttons) => api.sendMessage(ownerId, text, buttons),
         edit: (id, text) => api.editMessage(ownerId, id, text),
+        deleteOwnerMessage: (id) => api.deleteMessage(ownerId, id),
       }
     : new ConsoleNotifier();
 

@@ -21,6 +21,8 @@ const EXPECTED_TABLES = [
   "policy_unlocks",
   "publish_packages",
   "reviews",
+  "skill_runs",
+  "skills",
   "system_state",
   "task_events",
   "tasks",

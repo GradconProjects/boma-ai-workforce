@@ -4,6 +4,8 @@ import type { InlineButton } from "@boma/connectors";
 export interface Notifier {
   send(text: string, buttons?: InlineButton[][]): Promise<number>;
   edit(messageId: number, text: string): Promise<void>;
+  /** Remove one of the owner's own messages (e.g. a typed passcode). Optional. */
+  deleteOwnerMessage?(messageId: number): Promise<void>;
 }
 
 export class ConsoleNotifier implements Notifier {

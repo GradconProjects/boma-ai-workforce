@@ -44,6 +44,7 @@ export interface TelegramApi {
     buttons?: InlineButton[][],
   ): Promise<void>;
   answerCallback(callbackId: string, text?: string): Promise<void>;
+  deleteMessage?(chatId: number, messageId: number): Promise<void>;
 }
 
 export class TelegramError extends Error {}
@@ -135,6 +136,11 @@ export class HttpTelegramApi implements TelegramApi {
     });
   }
 
+  /** Delete a message in the owner's chat (used to remove a typed passcode). */
+  async deleteMessage(chatId: number, messageId: number): Promise<void> {
+    await this.call("deleteMessage", { chat_id: chatId, message_id: messageId });
+  }
+
   /** Point Telegram at our webhook. Telegram echoes `secretToken` in a header we verify. */
   async setWebhook(url: string, secretToken: string): Promise<void> {
     await this.call("setWebhook", {
@@ -155,6 +161,7 @@ export class MockTelegramApi implements TelegramApi {
   sent: { chatId: number; messageId: number; text: string; buttons?: InlineButton[][] }[] = [];
   edits: { chatId: number; messageId: number; text: string }[] = [];
   answered: { id: string; text?: string }[] = [];
+  deleted: { chatId: number; messageId: number }[] = [];
   queue: TgUpdate[] = [];
   private nextId = 1000;
 
@@ -173,6 +180,9 @@ export class MockTelegramApi implements TelegramApi {
   }
   async answerCallback(id: string, text?: string): Promise<void> {
     this.answered.push({ id, text });
+  }
+  async deleteMessage(chatId: number, messageId: number): Promise<void> {
+    this.deleted.push({ chatId, messageId });
   }
   lastText(): string {
     return this.sent.at(-1)?.text ?? "";

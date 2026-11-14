@@ -13,6 +13,7 @@ const config: NextConfig = {
     "@boma/review",
     "@boma/connectors",
     "@boma/worker",
+    "@boma/skills",
   ],
   serverExternalPackages: ["pg"],
   poweredByHeader: false,
@@ -22,7 +23,12 @@ const config: NextConfig = {
   // that the server reads from disk (they are not imported, so tracing can't find them alone).
   outputFileTracingRoot: resolve(import.meta.dirname, "../.."),
   outputFileTracingIncludes: {
-    "/**": ["../../config/**", "../../bots/**", "../../packages/db/migrations/**"],
+    "/**": [
+      "../../config/**",
+      "../../bots/**",
+      "../../packages/db/migrations/**",
+      "../../skills/**",
+    ],
   },
 };
 

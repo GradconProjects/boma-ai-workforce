@@ -64,6 +64,11 @@ export const envSchema = z.object({
   ),
   TZ: z.preprocess(blankToUndefined, z.string().default("Australia/Sydney")),
 
+  SKILLS_PASSCODE: z.preprocess(
+    blankToUndefined,
+    z.string().min(6, "must be at least 6 characters").optional(),
+  ),
+
   OWNER_PASSWORD: z.preprocess(
     blankToUndefined,
     z.string().min(12, "must be at least 12 characters").optional(),

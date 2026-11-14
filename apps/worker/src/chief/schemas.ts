@@ -5,6 +5,8 @@ export const classifySchema = z.object({
   clarifying_question: z.string().nullable(),
   control: z.enum(["pause_all", "resume", "status", "budget", "approvals", "bots"]).nullable(),
   summary: z.string(),
+  /** Slug of a library skill that fits the request, if any (validated against the catalogue in code). */
+  skill: z.string().nullable().optional(),
 });
 export type Classification = z.infer<typeof classifySchema>;
 

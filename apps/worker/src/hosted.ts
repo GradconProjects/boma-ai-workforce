@@ -90,6 +90,7 @@ export async function createHostedRuntime(
     ? {
         send: (t, b) => api.sendMessage(ownerId, t, b),
         edit: (id, t) => api.editMessage(ownerId, id, t),
+        deleteOwnerMessage: (id) => api.deleteMessage(ownerId, id),
       }
     : {
         send: async (t) => (console.log(`[owner] ${t.split("\n")[0]}`), 0),
@@ -104,6 +105,12 @@ export async function createHostedRuntime(
     prices: simulated ? simulationPrices() : PriceTable.load(join(root, "config/prices.yaml")),
     providers: simulated ? simulationProviders() : undefined,
     simulated,
+    skillsDir: join(root, "skills"),
+    appUrl:
+      process.env.APP_URL ??
+      (process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : undefined),
   });
   const gateway = api
     ? new TelegramGateway(api, db, ownerId, {

@@ -80,18 +80,34 @@ export function simulationProviders() {
         };
       }
       default:
+        if (!req.schema) {
+          // Skill runs ask for plain text.
+          return {
+            text: "This is a sample answer produced in simulation mode. No AI model read your request or applied the skill. Add your API keys and set BOMA_SIMULATION=0 for real answers.",
+          };
+        }
         return { json: {} };
     }
   });
-  const openai = new MockProvider("openai", () => ({
-    json: {
-      verdict: "pass",
-      score: 0,
-      issues: [],
-      claims_checked: [],
-      injection_detected: false,
-      summary: "Simulated review: not a real check.",
-    },
-  }));
+  const openai = new MockProvider("openai", (req: LlmRequest) =>
+    req.schemaName === "critique"
+      ? {
+          json: {
+            verdict: "sound",
+            issues: [],
+            summary: "Simulated check: nothing was really reviewed.",
+          },
+        }
+      : {
+          json: {
+            verdict: "pass",
+            score: 0,
+            issues: [],
+            claims_checked: [],
+            injection_detected: false,
+            summary: "Simulated review: not a real check.",
+          },
+        },
+  );
   return { anthropic, openai };
 }

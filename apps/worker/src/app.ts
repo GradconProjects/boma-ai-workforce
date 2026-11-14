@@ -15,6 +15,7 @@ import { DualReviewer } from "@boma/review";
 import { ChiefOfStaff } from "./chief/chief";
 import { draftCreativeHandler } from "./chief/draft-creative";
 import { draftPostHandler } from "./chief/draft-post";
+import { skillRunHandler } from "./chief/skill-run";
 import type { Notifier } from "./chief/notifier";
 
 /** Builds the Chief, reviewer and task handlers from env + database. Shared by worker and web. */
@@ -29,6 +30,10 @@ export interface AppOptions {
   providers?: Partial<Record<"anthropic" | "openai" | "deepseek", LlmProvider>>;
   /** True when providers are the labelled simulation set. */
   simulated?: boolean;
+  /** Absolute path of the built-in skills folder (default: ./skills). */
+  skillsDir?: string;
+  /** Public URL of the web app, for links in Telegram. */
+  appUrl?: string;
 }
 
 export function modelsFromEnv(env: Env) {
@@ -86,7 +91,16 @@ export async function buildApp(o: AppOptions) {
   });
   const reviewer = new DualReviewer(o.db, llm);
   const chiefBot = await loadBotSettings(o.db, "chief-of-staff");
-  const chief = new ChiefOfStaff({ db: o.db, policy: o.policy, llm, notify: o.notify, models, tz });
+  const skillsDir = o.skillsDir ?? "skills";
+  const chief = new ChiefOfStaff({
+    db: o.db,
+    policy: o.policy,
+    llm,
+    notify: o.notify,
+    models,
+    tz,
+    skills: { dir: skillsDir, passcode: o.env.SKILLS_PASSCODE },
+  });
   const limits = {
     chiefBotId: chiefBot.id,
     chiefMonthlyAud: await scopeLimit(
@@ -120,7 +134,24 @@ export async function buildApp(o: AppOptions) {
     limits,
     simulated: Boolean(o.simulated),
   });
-  return { chief, llm, reviewer, handlers: [draftPost, draftCreative], models, tz };
+  const skillRun = skillRunHandler({
+    db: o.db,
+    llm,
+    notify: o.notify,
+    models,
+    skillsDir,
+    simulated: Boolean(o.simulated),
+    limits: {
+      chiefBotId: chiefBot.id,
+      skillsMonthlyAud: await scopeLimit(
+        o.db,
+        "bot:skills",
+        o.policy.budget.allocations.skills ?? 8,
+      ),
+    },
+    appUrl: o.appUrl,
+  });
+  return { chief, llm, reviewer, handlers: [draftPost, draftCreative, skillRun], models, tz };
 }
 
 export { MockProvider };

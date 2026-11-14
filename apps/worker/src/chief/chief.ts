@@ -21,6 +21,18 @@ import {
 import { listBots, loadBotSettings, type BotSettings } from "@boma/bots";
 import { approvalButtons, type ApprovalAction } from "@boma/connectors";
 import { FxRateMissingError, type BudgetedLlm, type ModelRef } from "@boma/llm";
+import {
+  dispatchSkill,
+  isUnlocked,
+  loadAllSkills,
+  loadRepoSkills,
+  lockSkills,
+  matchSkills,
+  passcodeConfigured,
+  setSkillSettings,
+  tryUnlock,
+  type Skill,
+} from "@boma/skills";
 import { approvalMessage } from "./draft-post";
 import type { Notifier } from "./notifier";
 import { answerSchema, classifySchema, planSchema, type Classification } from "./schemas";
@@ -39,10 +51,17 @@ export interface ChiefDeps {
   tz: string;
   /** Rough A$ cost of one draft_post task (maker + checker), for the pre-dispatch budget check. */
   draftPostEstimateAud?: number;
+  /** Skills library: where the built-in skills live and the owner's passcode for high-risk ones. */
+  skills?: { dir: string; passcode?: string };
 }
 
 const PENDING_CLARIFICATION = "chief:pending_clarification";
 const PENDING_EDIT = "chief:pending_edit";
+const PENDING_SKILL = "chief:pending_skill";
+
+/** Never store a typed passcode (audit log, chat history). */
+export const redactPasscode = (text: string) =>
+  /^\/unlock\b/i.test(text.trim()) ? "/unlock ••••••" : text;
 
 const HELP = [
   "I'm your Chief of Staff. Tell me what you need in plain English, e.g.",
@@ -56,6 +75,13 @@ const HELP = [
   "/pause_all – stop all new work immediately",
   "/resume – carry on",
   "/edit <bot> – how to change a bot",
+  "",
+  "Skills (used automatically when your request fits one):",
+  "/skills – the skills library",
+  "/skill <name> <request> – use a specific skill",
+  "/unlock <passcode> – unlock high-risk skills for 30 minutes",
+  "/lock – lock them again",
+  "/risk <name> high|standard – label a skill's risk",
 ].join("\n");
 
 export class ChiefOfStaff {
@@ -92,10 +118,10 @@ export class ChiefOfStaff {
     await audit(this.deps.db, {
       actor: "owner",
       action: "telegram.message",
-      inputs: text,
+      inputs: redactPasscode(text),
       result: "received",
     });
-    if (text.startsWith("/")) return this.command(text);
+    if (text.startsWith("/")) return this.command(text, messageId);
 
     const pendingEdit = await getState<{ approvalId: string } | null>(this.deps.db, PENDING_EDIT);
     if (pendingEdit) return this.applyOwnerEdit(pendingEdit.approvalId, text, messageId);
@@ -136,7 +162,23 @@ export class ChiefOfStaff {
       return;
     }
 
-    const c = await this.classify(request, alreadyClarified, bot);
+    // Skills: a clear trigger phrase routes straight to the skill (no classification call).
+    const skills = await this.enabledSkills();
+    const strong = matchSkills(request, skills, 1)[0];
+    if (strong?.strong) {
+      return this.runSkill(
+        skills.find((s) => s.fm.slug === strong.slug)!,
+        request,
+        messageId,
+      );
+    }
+
+    const c = await this.classify(request, alreadyClarified, bot, skills);
+    // The model may only name a skill from the catalogue; anything else is ignored.
+    const picked = c.skill ? skills.find((s) => s.fm.slug === c.skill) : undefined;
+    if (picked && (c.intent === "new_job" || c.intent === "question" || c.intent === "unclear")) {
+      return this.runSkill(picked, request, messageId);
+    }
     // C3: exactly one clarifying question, never a second.
     const intent: Classification["intent"] =
       c.intent === "unclear" && alreadyClarified ? "new_job" : c.intent;
@@ -164,6 +206,7 @@ export class ChiefOfStaff {
     request: string,
     alreadyClarified: boolean,
     bot: BotSettings,
+    skills: Skill[] = [],
   ): Promise<Classification> {
     const system = [
       "You classify messages from the business owner to his Chief of Staff bot.",
@@ -172,6 +215,13 @@ export class ChiefOfStaff {
       alreadyClarified
         ? "The owner has already answered one clarifying question. Do not ask another: choose the most reasonable interpretation."
         : "If intent is unclear, write exactly one short clarifying question.",
+      ...(skills.length
+        ? [
+            "Skills library (expert methods that apply to ANY topic of their kind, not only the examples in their descriptions):",
+            ...skills.map((s) => `- ${s.fm.slug}: ${s.fm.description.slice(0, 220)}`),
+            "skill: the slug of the one skill that best fits the request, or null if none clearly fits or the request is about posting content for a business (that is new_job without a skill).",
+          ]
+        : ["skill: null"]),
     ].join("\n");
     const r = await this.deps.llm.call(
       this.deps.models.cheap.provider,
@@ -334,7 +384,7 @@ export class ChiefOfStaff {
 
   // ───────────────────────── commands (no LLM, A$0) ─────────────────────────
 
-  async command(raw: string): Promise<void> {
+  async command(raw: string, messageId = 0): Promise<void> {
     const [cmd, ...args] = raw.trim().split(/\s+/);
     const db = this.deps.db;
     switch (cmd?.toLowerCase()) {
@@ -389,9 +439,168 @@ export class ChiefOfStaff {
           `To change ${args[0] ? `"${args[0]}"` : "a bot"}: edit bots/${args[0] ?? "<bot>"}.md on your computer and run pnpm bots:sync. Permission, budget and protected-action changes are owner-only (pnpm owner …); I can't make them.`,
         );
         return;
+      case "/skills":
+        await this.deps.notify.send(await this.skillsText());
+        return;
+      case "/skill": {
+        const all = await this.allSkills();
+        const skill = all.find((s) => s.fm.slug === args[0]?.toLowerCase());
+        const request = args.slice(1).join(" ").trim();
+        if (!skill || !request) {
+          await this.deps.notify.send(
+            "Usage: /skill <name> <your request>, e.g. /skill the-council should I hire a VA?\nSend /skills for the names.",
+          );
+          return;
+        }
+        await this.runSkill(skill, request, messageId);
+        return;
+      }
+      case "/unlock":
+        await this.unlock(args.join(" "), messageId);
+        return;
+      case "/lock":
+        await lockSkills(db);
+        await this.deps.notify.send("🔒 High-risk skills are locked again.");
+        return;
+      case "/risk":
+        await this.setRisk(args[0]?.toLowerCase(), args[1]?.toLowerCase());
+        return;
       default:
         await this.deps.notify.send(`I don't know ${cmd}. Send /help for commands.`);
     }
+  }
+
+  // ───────────────────────── skills ─────────────────────────
+
+  private async allSkills(): Promise<Skill[]> {
+    if (!this.deps.skills) return [];
+    return loadAllSkills(this.deps.db, loadRepoSkills(this.deps.skills.dir));
+  }
+
+  private async enabledSkills(): Promise<Skill[]> {
+    return (await this.allSkills()).filter((s) => s.fm.enabled);
+  }
+
+  private async skillsText(): Promise<string> {
+    const all = await this.allSkills();
+    if (!all.length) return "No skills are installed.";
+    const unlocked = await isUnlocked(this.deps.db, "telegram");
+    return [
+      "🧠 Skills library (used automatically when a request fits):",
+      ...all.map(
+        (s) =>
+          `• ${s.fm.slug}${s.fm.risk === "high" ? " 🔒" : ""}${s.fm.enabled ? "" : " ⏹ off"} — ${s.fm.description.slice(0, 90)}`,
+      ),
+      "",
+      all.some((s) => s.fm.risk === "high")
+        ? `🔒 = high-risk, needs /unlock <passcode> (${unlocked ? "unlocked now" : "locked now"}).`
+        : "No skills are labelled high-risk. Use /risk <name> high to lock one behind the passcode.",
+    ].join("\n");
+  }
+
+  /** Queue a skill run after the code checks (enabled, pause, passcode, budget). */
+  private async runSkill(skill: Skill, request: string, messageId: number): Promise<void> {
+    const r = await dispatchSkill(this.deps.db, this.deps.policy, {
+      skill,
+      request,
+      channel: "telegram",
+      idempotencyKey: `tg:${messageId}:skill`,
+      actor: "owner",
+    });
+    if (r.ok) {
+      if (!r.duplicate)
+        await this.deps.notify.send(
+          `🧠 Using ${skill.fm.name} (about A$${r.estimateAud.toFixed(2)}). I'll send the answer here shortly.`,
+        );
+      return;
+    }
+    if (r.reason === "locked") {
+      if (!passcodeConfigured(this.deps.skills?.passcode)) {
+        await this.deps.notify.send(
+          `🔒 ${skill.fm.name} is labelled high-risk, but SKILLS_PASSCODE isn't set, so it can't be unlocked. Add it to the environment, or relabel the skill with /risk ${skill.fm.slug} standard after setting a passcode.`,
+        );
+        return;
+      }
+      await setState(this.deps.db, PENDING_SKILL, { slug: skill.fm.slug, request, messageId });
+      await this.deps.notify.send(
+        `${r.message}\nSend /unlock <passcode> and I'll run it straight away. (I delete the message with your passcode.)`,
+      );
+      return;
+    }
+    await this.deps.notify.send(r.message);
+  }
+
+  private async unlock(presented: string, messageId: number): Promise<void> {
+    // Remove the passcode from the chat whatever the outcome.
+    if (messageId && this.deps.notify.deleteOwnerMessage) {
+      await this.deps.notify.deleteOwnerMessage(messageId).catch(() => undefined);
+    }
+    if (!presented.trim()) {
+      await this.deps.notify.send("Usage: /unlock <passcode>");
+      return;
+    }
+    const r = await tryUnlock(this.deps.db, "telegram", presented, this.deps.skills?.passcode);
+    if (!r.ok) {
+      const msg = {
+        not_configured: "⚙️ No SKILLS_PASSCODE is set, so there's nothing to unlock.",
+        wrong: "❌ That passcode isn't right.",
+        locked_out: `⛔ Too many wrong attempts. Try again after ${r.retryAt?.toLocaleTimeString("en-AU", { timeZone: this.deps.tz, hour: "numeric", minute: "2-digit" }) ?? "15 minutes"}.`,
+      }[r.reason];
+      await this.deps.notify.send(msg);
+      return;
+    }
+    await this.deps.notify.send(
+      "🔓 High-risk skills unlocked for 30 minutes. /lock to lock them now.",
+    );
+    const pending = await getState<{ slug: string; request: string; messageId: number } | null>(
+      this.deps.db,
+      PENDING_SKILL,
+    );
+    if (pending) {
+      await setState(this.deps.db, PENDING_SKILL, null);
+      const skill = (await this.allSkills()).find((s) => s.fm.slug === pending.slug);
+      if (skill) await this.runSkill(skill, pending.request, pending.messageId);
+    }
+  }
+
+  /**
+   * Owner labels a skill's risk. Locking (high) is always allowed; unlocking a skill (standard)
+   * weakens a protection, so it needs the passcode session first.
+   */
+  private async setRisk(slug: string | undefined, level: string | undefined): Promise<void> {
+    if (!slug || (level !== "high" && level !== "standard")) {
+      await this.deps.notify.send("Usage: /risk <skill name> high|standard");
+      return;
+    }
+    const all = await this.allSkills();
+    const skill = all.find((s) => s.fm.slug === slug);
+    if (!skill) {
+      await this.deps.notify.send(`No skill called "${slug}". Send /skills for the list.`);
+      return;
+    }
+    if (
+      level === "standard" &&
+      skill.fm.risk === "high" &&
+      !(await isUnlocked(this.deps.db, "telegram"))
+    ) {
+      await this.deps.notify.send(
+        "🔒 Removing the high-risk label needs your passcode first: /unlock <passcode>, then send this again.",
+      );
+      return;
+    }
+    const isRepo = skill.source === "repo";
+    await setSkillSettings(this.deps.db, slug, { risk: level }, isRepo);
+    await audit(this.deps.db, {
+      actor: "owner",
+      action: "skills.set_risk",
+      target: slug,
+      result: level,
+    });
+    await this.deps.notify.send(
+      level === "high"
+        ? `🔒 ${skill.fm.name} is now high-risk: it needs /unlock <passcode> before it runs.`
+        : `✅ ${skill.fm.name} is now standard: it runs without the passcode.`,
+    );
   }
 
   private async statusText(): Promise<string> {
@@ -528,6 +737,12 @@ export class ChiefOfStaff {
   async onTaskEvent(e: TaskEvent): Promise<void> {
     switch (e.type) {
       case "task.failed":
+        if (e.task.kind === "skill_run" && e.task.inputs.run_id) {
+          await this.deps.db.query(
+            "update skill_runs set status = 'failed', error = coalesce(error, $2), finished_at = coalesce(finished_at, now()) where id = $1",
+            [e.task.inputs.run_id, e.reason],
+          );
+        }
         await this.deps.notify.send(
           `❌ Task failed after ${e.attempts} attempt(s): ${e.task.kind}${e.task.workspace_slug ? ` · ${e.task.workspace_slug}` : ""}\nReason: ${e.reason}`,
         );
