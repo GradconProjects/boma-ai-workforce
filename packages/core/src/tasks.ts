@@ -26,13 +26,15 @@ export const TERMINAL: ReadonlySet<TaskStatus> = new Set([
   "cancelled",
 ]);
 
-/** Statuses a worker may pick up and continue. */
+/**
+ * Statuses a worker may pick up and continue. `approved` is deliberately absent: approved work
+ * waits for its publisher bot, which picks it up through its own task kind.
+ */
 export const CLAIMABLE: TaskStatus[] = [
   "queued",
   "running",
   "in_review",
   "revise",
-  "approved",
   "executing",
   "verifying",
 ];

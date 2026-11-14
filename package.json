@@ -17,7 +17,8 @@
     "bots:validate": "tsx packages/bots/src/cli.ts validate",
     "bots:sync": "tsx packages/bots/src/cli.ts sync",
     "secrets:scan": "tsx scripts/secret-scan.ts",
-    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm secrets:scan && pnpm bots:validate"
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm secrets:scan && pnpm bots:validate",
+    "worker": "pnpm --filter @boma/worker start"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

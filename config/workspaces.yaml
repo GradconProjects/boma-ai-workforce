@@ -1,0 +1,44 @@
+# Workspace rules, synced into the workspaces table when the worker starts.
+# banned_patterns are case-insensitive regular expressions checked in code before any review
+# spend (spec 02 §4.1). claim_register lists the facts posts may state, with their source.
+
+ongroundpm:
+  name: OnGroundPM
+  notes:
+    - Melbourne on-ground property management for landlords and investors.
+    - Friendly, practical, plain-English tone. No hype.
+    - Do not claim licences, accreditations or memberships the business does not hold.
+  banned_patterns:
+    - pattern: "\\blicen[cs]ed (real )?(estate )?(agents?|agency|property managers?)\\b"
+      reason: no licensing claims not held
+    - pattern: "\\b(guarantee[ds]?|promise[ds]?)\\b[^.]{0,40}\\b(returns?|profits?|yields?|income|rent)\\b"
+      reason: no guaranteed returns or rent
+    - pattern: "\\b(best|#1|number one|cheapest) (property manag|in melbourne)"
+      reason: no unprovable superlatives
+  claim_register: []
+  # Example entry:
+  #   - { id: C1, claim: "OnGroundPM carries out in-person property inspections", source: "owner" }
+
+boma-scans:
+  name: Boma Scans
+  notes:
+    - Educational content only. Not financial advice.
+    - Include a general-advice warning on anything about markets.
+  banned_patterns:
+    - pattern: "\\b(profit|returns?|gains?|win rate|guaranteed)\\b"
+      reason: no profit or performance claims
+    - pattern: "\\b(buy|sell) (now|signal)\\b"
+      reason: no trading calls
+  claim_register: []
+
+mypadiforum:
+  name: MyPadiForum
+  notes: []
+  banned_patterns: []
+  claim_register: []
+
+personal:
+  name: Personal
+  notes: []
+  banned_patterns: []
+  claim_register: []

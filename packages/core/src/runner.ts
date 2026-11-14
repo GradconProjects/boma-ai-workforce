@@ -105,7 +105,11 @@ export async function runTask(
       const out = await step.run(ctx);
       if (out instanceof Halt) {
         await saveCheckpoint(db, task.id, opts.workerId, cp);
-        task = await transition(db, task.id, out.status, actorFor(task), out.note, out.patch);
+        const current = await getTask(db, task.id);
+        task =
+          current.status === out.status
+            ? current // the step already moved it there (e.g. createApproval)
+            : await transition(db, task.id, out.status, actorFor(task), out.note, out.patch);
         await releaseLock(db, task.id, opts.workerId);
         if (out.status === "failed") {
           await emit({ type: "task.failed", task, reason: out.note, attempts: task.attempts });
