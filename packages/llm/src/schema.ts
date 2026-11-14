@@ -37,8 +37,21 @@ function strictify(node: unknown): unknown {
   return out;
 }
 
+const WIRE = Symbol.for("boma.wireSchema");
+
+/**
+ * Pair a tolerant parsing schema (with preprocessing that JSON Schema can't express) with the
+ * strict schema the model is asked to follow. Providers send the strict one; replies are
+ * validated with the tolerant one.
+ */
+export function withWireSchema<T extends z.ZodType>(lenient: T, wire: z.ZodType): T {
+  (lenient as unknown as Record<symbol, z.ZodType>)[WIRE] = wire;
+  return lenient;
+}
+
 export function toStrictJsonSchema(schema: z.ZodType): Record<string, unknown> {
-  return strictify(z.toJSONSchema(schema, { target: "draft-7" })) as Record<string, unknown>;
+  const wire = (schema as unknown as Record<symbol, z.ZodType | undefined>)[WIRE] ?? schema;
+  return strictify(z.toJSONSchema(wire, { target: "draft-7" })) as Record<string, unknown>;
 }
 
 export function parseStructured<T>(text: string, schema: z.ZodType<T>): T {

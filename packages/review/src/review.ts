@@ -355,7 +355,12 @@ export class DualReviewer {
           const res = await this.check(task, cfg, ref, output);
           return { ok: true as const, verdict: res.parsed, costAud: res.costAud };
         } catch (err) {
-          if (err instanceof MalformedOutputError) return { ok: false as const };
+          if (err instanceof MalformedOutputError) {
+            console.warn(
+              `[review] ${ref.provider} checker reply rejected: ${err.message.slice(0, 300)}`,
+            );
+            return { ok: false as const };
+          }
           throw err;
         }
       });

@@ -53,7 +53,9 @@ export class DeepSeekProvider implements LlmProvider {
       const choice = r.choices[0];
       const finish = choice?.finish_reason;
       return {
-        text: (choice?.message?.content ?? "").trim(),
+        text: req.schema
+          ? extractJsonObject(choice?.message?.content ?? "")
+          : (choice?.message?.content ?? "").trim(),
         model: r.model,
         usage: {
           inputTokens: r.usage?.prompt_tokens ?? 0,
@@ -82,4 +84,15 @@ export class DeepSeekProvider implements LlmProvider {
       throw err;
     }
   }
+}
+
+/** JSON mode usually returns a bare object, but strip ```json fences or stray prose if present. */
+export function extractJsonObject(raw: string): string {
+  const text = raw
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "");
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  return start >= 0 && end > start ? text.slice(start, end + 1) : text;
 }

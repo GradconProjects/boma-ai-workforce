@@ -2,9 +2,8 @@ import { join } from "node:path";
 import Link from "next/link";
 import { ArrowRight, Bot, Brain, Crown, Link2, Plug } from "lucide-react";
 import type { BotFrontmatter } from "@boma/bots";
-import { budgetStatus } from "@boma/core";
 import { loadAllSkills, loadRepoSkills } from "@boma/skills";
-import { db, env, policy, ROOT } from "@/lib/server";
+import { db, env, ROOT } from "@/lib/server";
 import { DeleteButton } from "@/components/delete-button";
 import { deleteWorkspaceAction } from "@/app/delete-actions";
 
@@ -44,7 +43,6 @@ export default async function Bots() {
   const skills = (await loadAllSkills(pool, loadRepoSkills(join(ROOT, "skills")))).filter(
     (s) => s.fm.enabled,
   );
-  const budget = await budgetStatus(pool, policy());
   const { rows: workspaces } = await pool.query<{ slug: string; name: string; owner_added: boolean }>(
     "select slug, name, owner_added from workspaces where owner_added or slug in ('personal','ongroundpm','mypadiforum','boma-scans') order by owner_added desc, name",
   );
