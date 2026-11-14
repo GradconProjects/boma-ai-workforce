@@ -1,0 +1,12 @@
+# Model prices in USD per 1 million tokens, used by the budget gateway to estimate and record
+# spend in AUD (via USD_TO_AUD_RATE). Verify against the providers' pricing pages when you set a
+# model in .env. The gateway REFUSES to call any model that is not listed here.
+
+anthropic:
+  claude-sonnet-5-5: { input: 2.00, output: 10.00 }
+  claude-haiku-5-5: { input: 0.10, output: 0.50 } # prompts up to 100K tokens
+  claude-opus-5-5: { input: 4.00, output: 20.00 }
+
+openai: {}
+# Add your checker models once chosen, e.g.:
+#   <model-id>: { input: 0.00, output: 0.00 }

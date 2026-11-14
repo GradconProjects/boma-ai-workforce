@@ -2,6 +2,7 @@
  * Shared test fixture: a throwaway database with all migrations applied and the repo's bot
  * files synced, plus the real policy. Each test file gets its own database.
  */
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { loadPolicy, type Policy } from "../packages/core/src";
@@ -12,6 +13,7 @@ import { createTempDb, SKIP_DB } from "../packages/db/src/testdb";
 export { SKIP_DB };
 
 export const repoPath = (rel: string) => fileURLToPath(new URL(`../${rel}`, import.meta.url));
+export const readFileSyncRepo = (rel: string) => readFileSync(repoPath(rel), "utf8");
 
 export interface Fixture {
   pool: pg.Pool;
