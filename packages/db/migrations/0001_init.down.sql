@@ -1,0 +1,20 @@
+-- Reverse of 0001_init. Order respects foreign keys.
+drop table if exists system_state;
+drop table if exists audit_log;
+drop table if exists memory;
+drop table if exists policy_unlocks;
+drop table if exists budget_limits;
+drop table if exists budget_ledger;
+drop table if exists publish_packages;
+alter table if exists tasks drop constraint if exists tasks_approval_fk;
+drop table if exists approvals;
+drop table if exists reviews;
+drop table if exists task_events;
+drop table if exists tasks;
+drop table if exists bot_account_grants;
+drop table if exists accounts;
+alter table if exists bots drop constraint if exists bots_current_version_fk;
+drop table if exists bot_versions;
+drop table if exists bots;
+drop table if exists workspaces;
+drop function if exists forbid_mutation();

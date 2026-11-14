@@ -1,0 +1,51 @@
+# Enforced by packages/core policy engine. Only the owner path may change this file's effect at runtime.
+
+autonomy_levels:
+  1: observe
+  2: prepare
+  3: approval
+  4: act_and_report
+  5: autonomous
+
+defaults:
+  new_action_level: 2
+  external_action_level: 3
+
+protected_actions:          # capped at level 3 unless an owner unlock exists in policy_unlocks
+  - payment
+  - spend_money
+  - trade
+  - job_application_submit
+  - tax_legal_lodgement
+  - delete_anything
+  - edit_live_post
+  - delete_live_post
+  - first_contact_new_recipient
+  - change_bot_permissions
+  - raise_budget
+
+approvals:
+  expire_after_scheduled_hours: 24
+  expire_unscheduled_hours: 72
+  owner_telegram_user_id_env: TELEGRAM_OWNER_USER_ID
+
+dual_review:
+  required_for: [external_output, protected_package]
+  max_revision_rounds: 2
+  makers_and_checkers_must_differ_by_provider: true
+
+budget:
+  currency: AUD
+  company_monthly_cap: 45
+  warn_at: 35
+  hard_stop_at: 45
+  safety_buffer_below: 50
+  allocations:
+    chief-of-staff: 3
+    dual-review: 5
+    facebook-page-poster: 0
+    contingency: 10
+
+system:
+  timezone: Australia/Sydney
+  kill_switch_command: /pause_all

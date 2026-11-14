@@ -1,0 +1,12 @@
+{
+  "name": "@boma/db",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@boma/core": "workspace:*",
+    "pg": "8.23.1"
+  }
+}
