@@ -18,6 +18,8 @@ const rulesSchema = z.object({
     .default([]),
   /** bold: provocative, debate-starting posts (still truthful and fair). */
   style: z.enum(["standard", "bold"]).default("standard"),
+  /** General-interest page: well-known public facts allowed (checked by the second AI). */
+  general_knowledge: z.boolean().default(false),
 });
 export type WorkspaceRules = z.infer<typeof rulesSchema>;
 
@@ -60,5 +62,12 @@ export async function getWorkspaceRules(db: Queryable, slug: string): Promise<Wo
   const parsed = rulesSchema.safeParse({ name: rows[0].name, ...(rows[0].rules as object) });
   return parsed.success
     ? parsed.data
-    : { name: rows[0].name, notes: [], banned_patterns: [], claim_register: [], style: "standard" };
+    : {
+        name: rows[0].name,
+        notes: [],
+        banned_patterns: [],
+        claim_register: [],
+        style: "standard",
+        general_knowledge: false,
+      };
 }

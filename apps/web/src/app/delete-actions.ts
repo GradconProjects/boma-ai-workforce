@@ -74,3 +74,12 @@ export async function deleteWorkspaceAction(slug: string): Promise<{ result: str
     return { result: "Retired: it has work history, so it's hidden instead of erased." };
   }
 }
+
+export async function deleteBlogPostAction(id: string, ws: string): Promise<void> {
+  await requireOwner();
+  if (!UUID.test(id) || !/^[a-z0-9-]+$/.test(ws)) return;
+  await db().query("delete from blog_posts where id = $1", [id]);
+  await audit(db(), { actor: "owner", action: "blog.delete", target: id, result: "deleted" });
+  revalidatePath(`/blog/${ws}`);
+  redirect(`/blog/${ws}`);
+}

@@ -57,6 +57,7 @@ const EMPTY_RULES: WorkspaceRules = {
   notes: [],
   banned_patterns: [],
   style: "standard",
+  general_knowledge: false,
   claim_register: [],
 };
 const cost = (o: ReviewOutcome) => o.rounds.reduce((s, r) => s + r.costAud, 0);

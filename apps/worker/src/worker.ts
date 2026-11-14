@@ -83,6 +83,7 @@ export class Worker {
   async maintenanceTick(now = new Date()): Promise<void> {
     await this.deps.chief.onExpiredApprovals(await expireDueApprovals(this.deps.db, now));
     await this.deps.chief.sendUnsentApprovals();
+    await this.deps.chief.publishApproved();
     await syncItemStatusesFromApprovals(this.deps.db);
   }
 

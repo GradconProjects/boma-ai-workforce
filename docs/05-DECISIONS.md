@@ -51,6 +51,13 @@
   simulated and never claims Claude/OpenAI made or checked it.
 - Creative Studio web app: Next.js 16 + Tailwind 4 + lucide-react icons; owner password login.
 - Template backgrounds are OpenArt placeholders (150 credits); the owner will supply real images.
+- **Bot abilities added on the owner's instruction (14 Nov 2026):** blogs (one public blog per
+  workspace at `/blog/<workspace>`; articles are dual-reviewed, approved, then published and a
+  Facebook post linking to them is drafted); workspaces created by the owner in chat; per-workspace
+  autopilot (clean dual-reviewed posts auto-approved for 30 days, never ads or spend); `bold` style.
+- **General-knowledge workspaces** (owner-created, general-interest pages): makers may state
+  well-established public facts cited as "general knowledge"; the checker (a different AI) must
+  verify each one. Business workspaces keep the strict claim register.
 
 ## Still open
 

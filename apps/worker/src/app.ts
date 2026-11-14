@@ -14,7 +14,7 @@ import {
 import { DualReviewer } from "@boma/review";
 import { ChiefOfStaff } from "./chief/chief";
 import { draftCreativeHandler } from "./chief/draft-creative";
-import { draftPostHandler } from "./chief/draft-post";
+import { BLOG_ARTICLE, draftPostHandler } from "./chief/draft-post";
 import { skillRunHandler } from "./chief/skill-run";
 import type { Notifier } from "./chief/notifier";
 
@@ -124,6 +124,7 @@ export async function buildApp(o: AppOptions) {
     models,
     tz,
     skills: { dir: skillsDir, passcode: o.env.SKILLS_PASSCODE },
+    appUrl: o.appUrl,
   });
   const limits = {
     chiefBotId: chiefBot.id,
@@ -149,6 +150,19 @@ export async function buildApp(o: AppOptions) {
     limits,
     simulated: Boolean(o.simulated),
   });
+  const writeArticle = draftPostHandler(
+    {
+      db: o.db,
+      policy: o.policy,
+      reviewer,
+      notify: o.notify,
+      models,
+      tz,
+      limits: { ...limits, taskMaxAud: Math.max(limits.taskMaxAud, 0.6) },
+      simulated: Boolean(o.simulated),
+    },
+    BLOG_ARTICLE,
+  );
   const draftCreative = draftCreativeHandler({
     db: o.db,
     policy: o.policy,
@@ -176,7 +190,14 @@ export async function buildApp(o: AppOptions) {
     },
     appUrl: o.appUrl,
   });
-  return { chief, llm, reviewer, handlers: [draftPost, draftCreative, skillRun], models, tz };
+  return {
+    chief,
+    llm,
+    reviewer,
+    handlers: [draftPost, writeArticle, draftCreative, skillRun],
+    models,
+    tz,
+  };
 }
 
 export { MockProvider };

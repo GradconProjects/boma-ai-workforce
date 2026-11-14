@@ -7,6 +7,7 @@ const EXPECTED_TABLES = [
   "accounts",
   "approvals",
   "audit_log",
+  "blog_posts",
   "bot_account_grants",
   "bot_versions",
   "bots",

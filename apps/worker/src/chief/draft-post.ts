@@ -54,9 +54,52 @@ type ReviewResult =
 
 const totalCost = (o: ReviewOutcome) => o.rounds.reduce((s, r) => s + r.costAud, 0);
 
-export function draftPostHandler(deps: DraftPostDeps): TaskHandler {
+/** What kind of piece is being written (same review and approval flow for each). */
+export interface ContentVariant {
+  kind: string;
+  platform: { name: string; maxChars: number };
+  contentPlatform: string;
+  label: string;
+  guidance: (name: string, style: "standard" | "bold") => string;
+  rubric: (style: "standard" | "bold") => string[];
+  extraChecks?: (text: string) => string[];
+}
+
+export const FACEBOOK_POST: ContentVariant = {
+  kind: "draft_post",
+  platform: { name: "Facebook Page post", maxChars: 1500 },
+  contentPlatform: "facebook_page",
+  label: "Facebook Page post",
+  guidance: (n, s) => postGuidance(n, s),
+  rubric: (s) => postRubric(s),
+};
+
+export const BLOG_ARTICLE: ContentVariant = {
+  kind: "write_article",
+  platform: { name: "Blog article", maxChars: 9000 },
+  contentPlatform: "blog",
+  label: "Blog article",
+  guidance: (n, s) => articleGuidance(n, s),
+  rubric: (s) => [
+    "Reads like a good blog article: a strong title, an opening that hooks, clear sections, a satisfying ending.",
+    ...(s === "bold"
+      ? [
+          "Opinionated and provocative is WANTED: do not mark it down for taking a side on everyday topics. Fail it for invented facts, defamation, attacks on private people or protected groups, or exploiting tragedies.",
+        ]
+      : []),
+  ],
+  extraChecks: (text) =>
+    /^#\s+\S/.test(text.trim())
+      ? []
+      : ["The first line must be the title as a Markdown heading: # Title"],
+};
+
+export function draftPostHandler(
+  deps: DraftPostDeps,
+  v: ContentVariant = FACEBOOK_POST,
+): TaskHandler {
   return {
-    kind: "draft_post",
+    kind: v.kind,
     steps: [
       {
         name: "review",
@@ -76,9 +119,11 @@ export function draftPostHandler(deps: DraftPostDeps): TaskHandler {
               claimRegister: rules.claim_register,
               bannedPatterns: rules.banned_patterns,
               workspaceNotes: rules.notes,
-              rubricExtras: postRubric(rules.style),
-              platform: { name: "Facebook Page post", maxChars: 1500 },
-              makerGuidance: postGuidance(rules.name, rules.style),
+              rubricExtras: v.rubric(rules.style),
+              platform: v.platform,
+              makerGuidance: v.guidance(rules.name, rules.style),
+              generalKnowledge: rules.general_knowledge,
+              extraChecks: v.extraChecks,
             },
             {
               maker: deps.models.planner,
@@ -162,10 +207,11 @@ export function draftPostHandler(deps: DraftPostDeps): TaskHandler {
             ? (await getApproval(deps.db, ctx.task.approval_id))!
             : await createApproval(deps.db, {
                 taskId: ctx.task.id,
-                content: { text: r.text, workspace, platform: "facebook_page" },
+                content: { text: r.text, workspace, platform: v.contentPlatform },
                 preview: {
                   text: r.text,
                   workspace,
+                  label: v.label,
                   review: r.kind === "ready" ? r.evidence : r.report,
                   simulated: Boolean(deps.simulated),
                   costAud: r.costAud,
@@ -242,4 +288,19 @@ export function postRubric(style: "standard" | "bold" = "standard"): string[] {
         ]
       : []),
   ];
+}
+
+/** How the maker writes blog articles. */
+export function articleGuidance(name: string, style: "standard" | "bold" = "standard"): string {
+  return [
+    `Write one blog article for ${name}'s public blog, in Markdown.`,
+    "First line: the title as '# Title' (curiosity-driven, under 70 characters, no clickbait lies). Then a 1-2 sentence hook, 3-5 sections with '## ' headings, and a short ending.",
+    "Length: 500 to 800 words. Voice: a sharp, funny Australian creator writing for 18-35s: conversational, specific, a few well-placed jokes, no corporate filler.",
+    "End with a question that invites readers to have their say on the Facebook page.",
+    ...(style === "bold"
+      ? [
+          "Style: BOLD. Take a clear side, bust myths, compare and rank things, stir friendly rivalry. Honest drama only: no invented facts, statistics or quotes; no attacks on private people or protected groups; no exploiting tragedies.",
+        ]
+      : []),
+  ].join("\n");
 }

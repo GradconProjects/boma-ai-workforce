@@ -11,7 +11,7 @@ export const classifySchema = z.object({
 export type Classification = z.infer<typeof classifySchema>;
 
 /** Task kinds the Chief can dispatch in this release. */
-export const DISPATCHABLE_KINDS = ["draft_post", "skill_run"] as const;
+export const DISPATCHABLE_KINDS = ["draft_post", "skill_run", "write_article"] as const;
 
 export const planSchema = z.object({
   reply: z.string(),

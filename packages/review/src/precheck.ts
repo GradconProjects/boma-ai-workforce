@@ -22,6 +22,8 @@ export interface PrecheckConfig {
   claimRegister: ClaimRegisterEntry[];
   /** URLs present in the task's sources; claims may cite these too. */
   sourceUrls?: string[];
+  /** General-interest workspaces: claims may cite "general knowledge" (the checker verifies them). */
+  allowGeneralKnowledge?: boolean;
 }
 
 export function precheck(out: MakerOutput, cfg: PrecheckConfig): Issue[] {
@@ -63,7 +65,8 @@ export function precheck(out: MakerOutput, cfg: PrecheckConfig): Issue[] {
   const registerIds = new Set(cfg.claimRegister.map((c) => c.id));
   const urls = new Set(cfg.sourceUrls ?? []);
   for (const c of out.claims) {
-    if (!registerIds.has(c.source) && !urls.has(c.source)) {
+    const general = cfg.allowGeneralKnowledge && /^general knowledge$/i.test(c.source.trim());
+    if (!general && !registerIds.has(c.source) && !urls.has(c.source)) {
       add({
         severity: "major",
         category: "unsupported_claim",

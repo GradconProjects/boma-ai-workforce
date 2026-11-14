@@ -35,6 +35,7 @@ import {
   tryUnlock,
   type Skill,
 } from "@boma/skills";
+import { publishApprovedArticles } from "./blog";
 import { approvalMessage } from "./draft-post";
 import type { Notifier } from "./notifier";
 import { answerSchema, classifySchema, planSchema, type Classification } from "./schemas";
@@ -55,6 +56,8 @@ export interface ChiefDeps {
   draftPostEstimateAud?: number;
   /** Skills library: where the built-in skills live and the owner's passcode for high-risk ones. */
   skills?: { dir: string; passcode?: string };
+  /** Public base URL of the app (for blog links). */
+  appUrl?: string;
 }
 
 const PENDING_CLARIFICATION = "chief:pending_clarification";
@@ -322,6 +325,7 @@ export class ChiefOfStaff {
       "Turn his newest message (read with the conversation so far) into a plan of tasks for the bots, and act now.",
       "Available task kinds:",
       "- draft_post: draft one Facebook Page post for a workspace (it is reviewed and sent to the owner for approval; nothing is published by this task). One task per post.",
+      "- write_article: write one article for a workspace's public blog (brief = topic and angle). After review and approval it is published on the blog automatically, and a Facebook post linking to it is drafted. Every workspace has a blog; just plan articles for it. One task per article.",
       "- skill_run: ask one expert skill from the library (set `skill` to its slug; `brief` is the full question). Its answer goes to the owner.",
       ...(skillCatalogue.length
         ? ["Skills library:", ...skillCatalogue]
@@ -377,7 +381,16 @@ export class ChiefOfStaff {
       const created = await this.deps.db.query(
         `insert into workspaces (slug, name, rules, owner_added) values ($1, $2, $3, true)
          on conflict (slug) do update set owner_added = true returning (xmax = 0) as inserted`,
-        [slug, name, { name, notes: [w.description.slice(0, 300)], style: w.style ?? "standard" }],
+        [
+          slug,
+          name,
+          {
+            name,
+            notes: [w.description.slice(0, 300)],
+            style: w.style ?? "standard",
+            general_knowledge: true,
+          },
+        ],
       );
       await audit(this.deps.db, {
         actor: "owner",
@@ -448,7 +461,13 @@ export class ChiefOfStaff {
     // C5: refuse work that would exceed the budget before dispatching any of it.
     const postEst = this.deps.draftPostEstimateAud ?? 0.08;
     const estimate = accepted.reduce(
-      (sum, t) => sum + (t.skillDef ? estimateSkillAud(t.skillDef) : postEst),
+      (sum, t) =>
+        sum +
+        (t.skillDef
+          ? estimateSkillAud(t.skillDef)
+          : t.kind === "write_article"
+            ? postEst * 3
+            : postEst),
       0,
     );
     const budget = await budgetStatus(this.deps.db, this.deps.policy, new Date(), this.deps.tz);
@@ -503,7 +522,7 @@ export class ChiefOfStaff {
         actor: "bot:chief-of-staff",
       });
       taskLines.push(
-        `${++n}. Draft post · ${task.workspace_slug} — ${(task.inputs.brief as string).slice(0, 90)}`,
+        `${++n}. ${t.kind === "write_article" ? "Blog article" : "Draft post"} · ${task.workspace_slug} — ${(task.inputs.brief as string).slice(0, 90)}`,
       );
     }
 
@@ -970,6 +989,7 @@ export class ChiefOfStaff {
     const { rows } = await this.deps.db.query<{ id: string }>(
       "select id from approvals where status = 'pending' and telegram_message_id is null order by expires_at",
     );
+    let autoDecided = false;
     for (const { id } of rows) {
       const a = (await getApproval(this.deps.db, id))!;
       // Autopilot: the owner pre-approved clean, dual-reviewed routine posts for this workspace.
@@ -980,7 +1000,10 @@ export class ChiefOfStaff {
           actor: "policy:autopilot",
           note: `by autopilot (${p.workspace}, score ${p.autopilot.score})`,
         });
-        if (r === "approved") continue;
+        if (r === "approved") {
+          autoDecided = true;
+          continue;
+        }
       }
       const messageId = await this.deps.notify.send(
         approvalMessage(a, this.deps.tz),
@@ -988,7 +1011,16 @@ export class ChiefOfStaff {
       );
       await setTelegramMessageId(this.deps.db, a.id, messageId);
     }
+    if (autoDecided) await this.publishApproved();
     return rows.length;
+  }
+
+  /** Publish approved blog articles and draft their Facebook posts (idempotent). */
+  async publishApproved(): Promise<number> {
+    return publishApprovedArticles(this.deps.db, {
+      appUrl: this.deps.appUrl,
+      notify: this.deps.notify,
+    });
   }
 
   private async resendApprovals() {
@@ -1039,6 +1071,7 @@ export class ChiefOfStaff {
         `${approvalMessage(a, this.deps.tz)}\n\n${label[result]}`,
       );
     }
+    if (result === "approved") await this.publishApproved();
     return label[result]!.slice(0, 190);
   }
 

@@ -464,4 +464,62 @@ describe.skipIf(SKIP_DB)("skills through the Chief", () => {
     );
     expect(manual.rows[0].status).toBe("awaiting_approval");
   });
+  it("writes a blog article, publishes it once approved, and drafts the Facebook post linking to it", async () => {
+    await fx.pool.query(
+      `insert into workspaces (slug, name, rules, owner_added) values ('aussie-blog', 'Aussie Blog', '{"name":"Aussie Blog","general_knowledge":true}', true)
+       on conflict (slug) do nothing`,
+    );
+    classification = { ...(classification as object), intent: "new_job" };
+    plan = {
+      reply: "Writing it now.",
+      tasks: [
+        {
+          kind: "write_article",
+          skill: null,
+          workspace: "aussie-blog",
+          brief: "Why magpies swoop",
+          scheduled_for: null,
+          uses_output_of: null,
+        },
+      ],
+      unsupported: [],
+      permission_changes_requested: [],
+    };
+    anthropic.setHandler((req: LlmRequest) => {
+      if (req.schemaName === "classification") return { json: classification };
+      if (req.schemaName === "plan") return { json: plan };
+      if (req.schemaName === "maker_output")
+        return /Blog article/.test(req.system)
+          ? {
+              json: {
+                text: "# Why Magpies Swoop\n\nSpring means helmets with cable ties.\n\n## The reason\n\nThey guard their nests.",
+                claims: [
+                  { claim: "Magpies swoop to guard nests in spring", source: "general knowledge" },
+                ],
+              },
+            }
+          : { json: { text: "Magpie season is here. Read why they swoop 👇", claims: [] } };
+      throw new Error(`unexpected call ${req.schemaName}`);
+    });
+    await say("write a blog article about why magpies swoop for Aussie Blog");
+    await runAll();
+    const appr = await fx.pool.query(
+      "select a.id from approvals a join tasks t on t.id = a.task_id where t.kind = 'write_article' and a.status = 'pending' order by a.created_at desc limit 1",
+    );
+    expect(appr.rows).toHaveLength(1);
+    expect((await fx.pool.query("select count(*)::int as n from blog_posts")).rows[0].n).toBe(0);
+    await chief.onApprovalButton(appr.rows[0].id, "approve");
+    const post = await fx.pool.query("select slug, title, body_md from blog_posts");
+    expect(post.rows[0]).toMatchObject({ slug: "why-magpies-swoop", title: "Why Magpies Swoop" });
+    expect(post.rows[0].body_md).not.toMatch(/^# /);
+    expect(texts()).toMatch(
+      /Published on the Aussie Blog blog[\s\S]*\/blog\/aussie-blog\/why-magpies-swoop/,
+    );
+    const fb = await fx.pool.query(
+      "select inputs->>'brief' as brief from tasks where kind = 'draft_post' and idempotency_key like '%:facebook'",
+    );
+    expect(fb.rows[0].brief).toContain("/blog/aussie-blog/why-magpies-swoop");
+    // Publishing twice changes nothing.
+    expect(await chief.publishApproved()).toBe(0);
+  });
 });
