@@ -14,6 +14,7 @@ import {
 import { estimateTokens, type PriceTable } from "./prices";
 import { parseStructured } from "./schema";
 import {
+  MalformedOutputError,
   RefusalError,
   type LlmProvider,
   type LlmRequest,
@@ -130,6 +131,10 @@ export class BudgetedLlm {
 
     if (raw.stopReason === "refusal")
       throw new RefusalError(`${providerName} declined the request`);
+    if (req.schema && raw.stopReason === "max_tokens")
+      throw new MalformedOutputError(
+        `${providerName} reply was cut off at the ${req.maxOutputTokens}-token limit`,
+      );
     const parsed = req.schema ? parseStructured(raw.text, req.schema) : (raw.text as T);
     return { raw, parsed, costAud };
   }
