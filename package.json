@@ -20,7 +20,8 @@
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm secrets:scan && pnpm bots:validate",
     "worker": "pnpm --filter @boma/worker start",
     "web": "pnpm --filter @boma/web dev",
-    "simulate": "pnpm --filter @boma/worker simulate"
+    "simulate": "pnpm --filter @boma/worker simulate",
+    "owner": "pnpm --silent --filter @boma/cli owner"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

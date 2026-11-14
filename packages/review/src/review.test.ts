@@ -24,6 +24,7 @@ const prices = new PriceTable({
     "test-checker": { input: 0.5, output: 2 },
     "test-checker-strong": { input: 2, output: 8 },
   },
+  deepseek: { "deepseek-flash": { input: 0.3, output: 1.2 } },
 });
 
 const goodPost = {
@@ -298,6 +299,35 @@ describe.skipIf(SKIP_DB)("dual review R1-R8", () => {
     expect(lintBot(parseBotFile(raw), { policy: fx.policy }).errors.map((e) => e.rule)).toContain(
       "same_provider_review",
     );
+  });
+
+  it("DeepSeek can be the checker (Claude makes, DeepSeek checks)", async () => {
+    const deepseek = new MockProvider("deepseek", () => ({ json: { ...passVerdict, score: 86 } }));
+    const llm = new BudgetedLlm({
+      db: fx.pool,
+      policy: fx.policy,
+      prices,
+      fxUsdToAud: 1.55,
+      providers: { anthropic: maker, deepseek },
+    });
+    const out = await new DualReviewer(fx.pool, llm).run(
+      task,
+      cfg({ checker: { provider: "deepseek", model: "deepseek-flash" }, checkerStrong: undefined }),
+    );
+    expect(out.status).toBe("pass");
+    if (out.status === "pass")
+      expect(out.evidenceLine).toBe("✓ Claude made · ✓ DeepSeek checked (score 86, 0 critical)");
+    expect(deepseek.calls).toHaveLength(1);
+    await expect(
+      new DualReviewer(fx.pool, llm).run(
+        task,
+        cfg({
+          maker: { provider: "deepseek", model: "deepseek-flash" },
+          checker: { provider: "deepseek", model: "deepseek-flash" },
+          checkerStrong: undefined,
+        }),
+      ),
+    ).rejects.toThrow(ReviewConfigError);
   });
 
   it("C5: a review that would exceed the task budget is blocked before calling", async () => {

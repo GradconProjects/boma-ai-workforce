@@ -30,6 +30,9 @@ export const envSchema = z.object({
   OPENAI_MODEL_CHECKER: str(),
   OPENAI_MODEL_CHECKER_STRONG: str(),
 
+  DEEPSEEK_API_KEY: str(),
+  DEEPSEEK_MODEL: str(),
+
   TELEGRAM_BOT_TOKEN: str(),
   TELEGRAM_OWNER_USER_ID: z.preprocess(
     blankToUndefined,

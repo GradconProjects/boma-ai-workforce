@@ -35,6 +35,23 @@
 - Extra dependencies beyond the stated stack: `yaml` (frontmatter + policy), `pg` (Postgres driver), `tsx` (run TS scripts), `typescript`, `typescript-eslint`, `@eslint/js`, `@types/node`, `@types/pg`.
 - RLS is enabled on every table with no policies (deny by default). Owner-read policies come with the dashboard in Phase 5.
 
+## Phase 1 + Creative Studio decisions (14 Nov 2026) — review at the gate
+
+- Crash recovery: workers reclaim any task whose lease lapsed (not only `queued`), so E1 passes.
+- `approved` tasks are not claimable; they wait for their publisher bot (Phase 2).
+- Dual review: at most 2 checker rounds, then a disagreement report (R5's "no third round").
+- An owner Edit on Telegram redrafts through the full dual review (rule 7), never raw text.
+- Briefs are templated from the database (A$0), so they keep working at the budget stop.
+- Approval content hashes use canonical JSON (sorted keys).
+- **DeepSeek** added as a third provider (owner request). Used as the checker when no OpenAI checker
+  is set; JSON mode only, so the schema goes in the prompt and replies are validated. Priced at peak
+  rates. Requests are processed outside Australia: keep it out of personal/finance work unless
+  the owner opts in.
+- Simulation mode (`pnpm simulate`) uses scripted providers at A$0; every output says it is
+  simulated and never claims Claude/OpenAI made or checked it.
+- Creative Studio web app: Next.js 16 + Tailwind 4 + lucide-react icons; owner password login.
+- Template backgrounds are OpenArt placeholders (150 credits); the owner will supply real images.
+
 ## Still open
 
 1. Exact email account list (7–10 accounts, providers).

@@ -4,6 +4,7 @@ import { DEFAULT_TZ, scopeLimit, type Env, type Policy } from "@boma/core";
 import {
   AnthropicProvider,
   BudgetedLlm,
+  DeepSeekProvider,
   MockProvider,
   OpenAIProvider,
   PriceTable,
@@ -25,7 +26,7 @@ export interface AppOptions {
   notify: Notifier;
   prices: PriceTable;
   /** Simulation: scripted providers, no network, no spend recorded against real APIs. */
-  providers?: Partial<Record<"anthropic" | "openai", LlmProvider>>;
+  providers?: Partial<Record<"anthropic" | "openai" | "deepseek", LlmProvider>>;
   /** True when providers are the labelled simulation set. */
   simulated?: boolean;
 }
@@ -43,13 +44,22 @@ export function modelsFromEnv(env: Env) {
     provider: "anthropic",
     model: need(env.ANTHROPIC_MODEL_MAKER, "ANTHROPIC_MODEL_MAKER"),
   };
-  const checker: ModelRef = {
-    provider: "openai",
-    model: need(env.OPENAI_MODEL_CHECKER, "OPENAI_MODEL_CHECKER"),
-  };
-  const checkerStrong: ModelRef | undefined = env.OPENAI_MODEL_CHECKER_STRONG
-    ? { provider: "openai", model: env.OPENAI_MODEL_CHECKER_STRONG }
-    : undefined;
+  // Checker: OpenAI by default; DeepSeek when only DeepSeek is configured. Either way it is a
+  // different provider from the maker (Claude), as the dual review requires.
+  let checker: ModelRef;
+  let checkerStrong: ModelRef | undefined;
+  if (env.OPENAI_MODEL_CHECKER) {
+    checker = { provider: "openai", model: env.OPENAI_MODEL_CHECKER };
+    checkerStrong = env.OPENAI_MODEL_CHECKER_STRONG
+      ? { provider: "openai", model: env.OPENAI_MODEL_CHECKER_STRONG }
+      : undefined;
+  } else if (env.DEEPSEEK_MODEL) {
+    checker = { provider: "deepseek", model: env.DEEPSEEK_MODEL };
+  } else {
+    throw new Error(
+      "Set OPENAI_MODEL_CHECKER (or DEEPSEEK_MODEL) in .env for the dual review checker",
+    );
+  }
   return { cheap, planner, checker, checkerStrong };
 }
 
@@ -58,7 +68,8 @@ export async function buildApp(o: AppOptions) {
   const models = modelsFromEnv(o.env);
   const providers = o.providers ?? {
     anthropic: new AnthropicProvider(),
-    openai: new OpenAIProvider(),
+    ...(o.env.OPENAI_API_KEY ? { openai: new OpenAIProvider() } : {}),
+    ...(o.env.DEEPSEEK_API_KEY ? { deepseek: new DeepSeekProvider() } : {}),
   };
   const llm = new BudgetedLlm({
     db: o.db,

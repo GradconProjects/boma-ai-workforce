@@ -8,7 +8,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   await requireOwner();
   const pending = (await pendingApprovals(db())).length;
   const e = env();
-  const simulation = !(e.ANTHROPIC_API_KEY && e.OPENAI_API_KEY);
+  const simulation = !(e.ANTHROPIC_API_KEY && (e.OPENAI_API_KEY || e.DEEPSEEK_API_KEY));
   return (
     <Shell pending={pending} simulation={simulation}>
       {children}

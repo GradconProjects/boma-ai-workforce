@@ -7,16 +7,21 @@ const price = z.object({ input: z.number().min(0), output: z.number().min(0) }).
 const pricesSchema = z.object({
   anthropic: z.record(z.string(), price).default({}),
   openai: z.record(z.string(), price).nullable().default({}),
+  deepseek: z.record(z.string(), price).nullable().default({}),
 });
 
 export type ModelPrice = z.infer<typeof price>;
 
 export class PriceTable {
-  constructor(private table: Record<ProviderName, Record<string, ModelPrice>>) {}
+  constructor(private table: Partial<Record<ProviderName, Record<string, ModelPrice>>>) {}
 
   static load(path = "config/prices.yaml"): PriceTable {
     const parsed = pricesSchema.parse(parse(readFileSync(path, "utf8")) ?? {});
-    return new PriceTable({ anthropic: parsed.anthropic, openai: parsed.openai ?? {} });
+    return new PriceTable({
+      anthropic: parsed.anthropic,
+      openai: parsed.openai ?? {},
+      deepseek: parsed.deepseek ?? {},
+    });
   }
 
   get(provider: ProviderName, model: string): ModelPrice {

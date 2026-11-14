@@ -10,3 +10,9 @@ anthropic:
 openai: {}
 # Add your checker models once chosen, e.g.:
 #   <model-id>: { input: 0.00, output: 0.00 }
+
+# DeepSeek: priced at PEAK rates (off-peak is half) so estimates are never low. Verified
+# 14 Nov 2026 at api-docs.deepseek.com/quick_start/pricing (cache-miss input).
+deepseek:
+  deepseek-flash: { input: 0.30, output: 1.20 }
+  deepseek-v4-pro: { input: 1.32, output: 3.96 }

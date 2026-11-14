@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { autonomyLevel } from "@boma/core";
 
-export const PROVIDERS = ["anthropic", "openai"] as const;
+export const PROVIDERS = ["anthropic", "openai", "deepseek"] as const;
 export const DEPARTMENTS = [
   "marketing",
   "creative",

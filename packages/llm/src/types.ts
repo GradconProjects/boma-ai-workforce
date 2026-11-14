@@ -1,11 +1,12 @@
 import type { z } from "zod";
 
-export type ProviderName = "anthropic" | "openai";
+export type ProviderName = "anthropic" | "openai" | "deepseek";
 export type Effort = "low" | "medium" | "high";
 
 export const PROVIDER_LABEL: Record<ProviderName, string> = {
   anthropic: "Claude",
   openai: "OpenAI",
+  deepseek: "DeepSeek",
 };
 
 export interface ModelRef {

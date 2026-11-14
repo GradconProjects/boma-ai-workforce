@@ -1,0 +1,13 @@
+{
+  "name": "@boma/cli",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "owner": "tsx src/owner.ts"
+  },
+  "dependencies": {
+    "@boma/bots": "workspace:*",
+    "@boma/core": "workspace:*",
+    "pg": "8.23.1"
+  }
+}

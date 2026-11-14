@@ -47,10 +47,17 @@ async function main() {
         "ANTHROPIC_API_KEY",
         "ANTHROPIC_MODEL_MAKER",
         "ANTHROPIC_MODEL_CHEAP",
-        "OPENAI_API_KEY",
-        "OPENAI_MODEL_CHECKER",
         "USD_TO_AUD_RATE",
       ]);
+  if (
+    !simulated &&
+    !(env.OPENAI_API_KEY && env.OPENAI_MODEL_CHECKER) &&
+    !(env.DEEPSEEK_API_KEY && env.DEEPSEEK_MODEL)
+  ) {
+    throw new Error(
+      "Set OPENAI_API_KEY + OPENAI_MODEL_CHECKER, or DEEPSEEK_API_KEY + DEEPSEEK_MODEL, for the review checker",
+    );
+  }
   if (!env.DATABASE_URL) throw new Error("DATABASE_URL is not set in .env");
   const policy = loadPolicy();
   const db = new pg.Pool({ connectionString: env.DATABASE_URL, max: 5 });
