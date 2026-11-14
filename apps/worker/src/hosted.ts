@@ -229,5 +229,17 @@ export async function appButton(
       text: { approve: "✅ Approve", edit: "✏️ Edit", reject: "❌ Reject" }[m[2] as "approve"],
     });
   }
-  return rt.chief.onApprovalButton(m[1]!, m[2] as "approve" | "edit" | "reject");
+  const action = m[2] as "approve" | "edit" | "reject";
+  const result = await rt.chief.onApprovalButton(m[1]!, action);
+  // A decided card loses its buttons everywhere in the app, so it can't be pressed again.
+  if (action !== "edit" || /^Already|expired|no longer/i.test(result)) {
+    await rt.db.query("update chat_messages set buttons = null where buttons::text like $1", [
+      `%appr:${m[1]}:%`,
+    ]);
+  }
+  // The Chief confirms in the same conversation (Edit already replies with its own prompt).
+  if (action !== "edit" && conversationId && isUuid(conversationId)) {
+    await logChat(rt.db, { role: "chief", channel: "app", conversationId, text: result });
+  }
+  return result;
 }

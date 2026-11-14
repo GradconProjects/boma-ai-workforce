@@ -155,4 +155,22 @@ describe.skipIf(SKIP_DB)("app chat (conversations across Telegram and the app)",
       "✅ Approved.",
     );
   });
+  it("an approval pressed in the app is confirmed in chat and the card loses its buttons", async () => {
+    const rt = fakeRuntime([]);
+    const conv = randomUUID();
+    const id = "33333333-3333-4333-8333-333333333333";
+    await appChat(rt, { text: "draft a post", clientId: "client-card-1", conversationId: conv });
+    const notify = withTranscript(fx.pool, { send: async () => 1, edit: async () => undefined });
+    await notify.send(
+      "Approval needed",
+      [[{ text: "✅ Approve", callback_data: `appr:${id}:approve` }]],
+      {
+        conversationId: conv,
+      },
+    );
+    expect(await appButton(rt, `appr:${id}:approve`, conv)).toBe("✅ Approved.");
+    const msgs = await chatHistory(fx.pool, { conversationId: conv });
+    expect(msgs.find((m) => m.text === "Approval needed")?.buttons).toBeNull();
+    expect(msgs.map((m) => m.text).slice(-2)).toEqual(["✅ Approve", "✅ Approved."]);
+  });
 });

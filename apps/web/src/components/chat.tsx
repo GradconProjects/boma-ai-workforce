@@ -62,6 +62,7 @@ type Preview =
   | { kind: "file"; title: string; url: string; mime: string };
 
 const OUTBOX_KEY = "boma-chat-outbox-v2";
+const DECIDED_KEY = "boma-chat-decided-v1";
 const historyKey = (c: string) => `boma-chat-v2:${c}`;
 const isPasscode = (t: string) => /^\/unlock\b/i.test(t.trim());
 const LONG = 1200;
@@ -201,6 +202,8 @@ export function Chat({ simulation }: { simulation: boolean }) {
   const [plusOpen, setPlusOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [preview, setPreview] = useState<Preview>();
+  const [decided, setDecided] = useState<Set<string>>(new Set());
+  useEffect(() => setDecided(new Set(load<string[]>(DECIDED_KEY, []))), []);
   const endRef = useRef<HTMLDivElement>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -384,7 +387,13 @@ export function Chat({ simulation }: { simulation: boolean }) {
     if (navigator.onLine) flush();
   };
 
-  const press = async (b: Button) => {
+  const press = async (messageId: string, b: Button) => {
+    if (decided.has(messageId)) return;
+    setDecided((d) => {
+      const next = new Set(d).add(messageId);
+      save(DECIDED_KEY, [...next].slice(-500));
+      return next;
+    });
     setThinking(true);
     try {
       const res = await fetch("/api/chat/button", {
@@ -392,9 +401,13 @@ export function Chat({ simulation }: { simulation: boolean }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ data: b.callback_data, conversationId: convRef.current }),
       });
-      const { result } = (await res.json()) as { result?: string };
-      if (result) setNote(result);
+      if (!res.ok) throw new Error("failed");
     } catch {
+      setDecided((d) => {
+        const next = new Set(d);
+        next.delete(messageId);
+        return next;
+      });
       setNote("You're offline. Try again when you're connected.");
     }
     await poll();
@@ -641,12 +654,12 @@ export function Chat({ simulation }: { simulation: boolean }) {
                           <Markdown text={m.text} onLink={openLink} />
                         )}
                       </div>
-                      {m.buttons && m.buttons.length > 0 && (
+                      {m.buttons && m.buttons.length > 0 && !decided.has(m.id) && (
                         <div className="mt-3 flex flex-wrap gap-2">
                           {m.buttons.flat().map((b) => (
                             <button
                               key={b.callback_data}
-                              onClick={() => press(b)}
+                              onClick={() => press(m.id, b)}
                               className="btn-outline rounded-full px-3.5 py-1.5 text-xs"
                             >
                               {b.text}
