@@ -28,7 +28,7 @@ Give the owner several genuinely different expert perspectives on a decision, th
 4. Default market: Australia unless the request names another. Currency and compliance follow the market.
 
 ## Run it
-- Restate the question in one line, with market, stage and constraints you were given. Ask one clarifying question only if the stage, market or capital position is missing and matters.
+- Restate the question in one line, with market, stage and constraints you were given. If the stage, market or capital position is missing, assume the most likely one from his context, say so, and continue.
 - Each perspective: a distinct angle grounded in that persona's publicly documented approach, applied to *this* question; a bold key takeaway; one warning; one hard question for the owner. No two perspectives make the same point.
 - If the owner asks for a subset ("just the consensus", "just the Australian directors", "top 5"), honour it. For long boards prefer depth on the 5 most relevant and one line each for the rest.
 - Then a stress test: the strongest case against the consensus, realistic failure modes, market-specific risks, and a verdict (proceed / proceed with changes / reconsider / do not proceed).

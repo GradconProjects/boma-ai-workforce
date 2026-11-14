@@ -478,6 +478,7 @@ export class ChiefOfStaff {
           idempotencyKey: `tg:${messageId}:${t.index}`,
           actor: "bot:chief-of-staff",
           handoff,
+          context: await this.skillContext(t.workspace),
           conversationId: await this.conversationOf(messageId),
         });
         if (!r.ok) {
@@ -805,10 +806,36 @@ export class ChiefOfStaff {
     return rows[0]?.conversation_id ?? null;
   }
 
-  private async runSkill(skill: Skill, request: string, messageId: number): Promise<void> {
+  /** Workspace notes and recent conversation, so skills don't work blind. */
+  private async skillContext(workspace?: string | null): Promise<string> {
+    const parts: string[] = [];
+    if (workspace) {
+      const { rows } = await this.deps.db.query<{
+        name: string;
+        rules: { notes?: string[]; style?: string };
+      }>("select name, rules from workspaces where slug = $1", [workspace]);
+      const w = rows[0];
+      if (w)
+        parts.push(
+          `Workspace: ${w.name}${w.rules?.style === "bold" ? " (bold, provocative style wanted)" : ""}. ${(w.rules?.notes ?? []).join(" ")}`,
+        );
+    }
+    const h = await this.history();
+    if (h.text) parts.push(h.text.trim());
+    parts.push("Country: Australia. Audience: Australians, especially younger social media users.");
+    return parts.join("\n\n");
+  }
+
+  private async runSkill(
+    skill: Skill,
+    request: string,
+    messageId: number,
+    workspace?: string | null,
+  ): Promise<void> {
     const r = await dispatchSkill(this.deps.db, this.deps.policy, {
       skill,
       request,
+      context: await this.skillContext(workspace),
       channel: "telegram",
       idempotencyKey: `tg:${messageId}:skill`,
       actor: "owner",

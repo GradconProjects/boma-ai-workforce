@@ -38,6 +38,8 @@ export async function dispatchSkill(
     workspace?: string | null;
     /** App conversation the answer belongs to (so a late answer lands where it was asked). */
     conversationId?: string | null;
+    /** The owner's context: workspace notes and recent conversation. */
+    context?: string;
   },
 ): Promise<DispatchResult> {
   const { skill } = o;
@@ -83,6 +85,7 @@ export async function dispatchSkill(
       channel: o.channel,
       ...(o.handoff?.length ? { handoff: o.handoff } : {}),
       ...(o.conversationId ? { conversation_id: o.conversationId } : {}),
+      ...(o.context ? { context: o.context.slice(0, 6000) } : {}),
     },
     idempotencyKey: o.idempotencyKey,
     estCostAud: estimateAud,

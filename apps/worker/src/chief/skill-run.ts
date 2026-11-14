@@ -36,6 +36,7 @@ export interface SkillRunInputs {
   /** Follow-up steps for other bots, planned by the Chief, that build on this answer. */
   handoff?: Handoff[];
   conversation_id?: string;
+  context?: string;
 }
 
 export interface Handoff {
@@ -118,7 +119,7 @@ export function skillRunHandler(deps: SkillRunDeps): TaskHandler {
           await deps.db.query("update skill_runs set status = 'running' where id = $1", [i.run_id]);
 
           const sections = selectSections(skill.references, i.request);
-          const { system, input } = buildSkillPrompt(skill, i.request, sections);
+          const { system, input } = buildSkillPrompt(skill, i.request, sections, i.context);
           const model = skill.fm.model === "cheap" ? deps.models.cheap : deps.models.planner;
           const outputCap = skill.fm.max_output_tokens;
           const budget = {

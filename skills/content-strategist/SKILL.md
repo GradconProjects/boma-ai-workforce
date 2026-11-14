@@ -21,7 +21,7 @@ enabled: true
 
 The reference material describes one channel format ("opposing view" documentaries). Treat it as one format among many: identify the owner's channel, brand, audience and format from the request or workspace, and apply the same production rigour.
 
-1. Establish channel, platform, format, length, audience, brand voice and visual treatment (one treatment per piece, never mixed). Ask one question only if the channel or format is unknown.
+1. Establish channel, platform, format, length, audience, brand voice and visual treatment (one treatment per piece, never mixed). If the channel or format is not stated, infer it from the owner's context (his page, workspace and conversation) and say what you assumed; never stop to ask.
 2. Angle: what makes this worth watching for this audience; for argument-led formats include a fair steelman before the counterpoint.
 3. Facts: only checkable claims with named sources; mark anything you could not verify. Never fabricate statistics.
 4. Script as one continuous narrative with hook, development, payoff and call to action sized to the platform.

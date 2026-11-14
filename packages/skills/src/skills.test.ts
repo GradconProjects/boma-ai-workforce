@@ -135,6 +135,10 @@ describe("skills engine", () => {
     expect(system).toMatch(/no AI-detection evasion/);
     expect(input).toContain("<untrusted_data");
     expect(input.endsWith("Help me plan my nursing reflection")).toBe(true);
+    expect(system).toMatch(/Never reply with only questions/);
+    const withCtx = buildSkillPrompt(skill, "election video", [], "Workspace: Shadow Aussie Page");
+    expect(withCtx.input).toContain("OWNER'S CONTEXT");
+    expect(withCtx.input).toContain("Shadow Aussie Page");
   });
 });
 
