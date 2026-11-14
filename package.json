@@ -9,7 +9,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p apps/web",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "db:migrate": "tsx packages/db/src/cli.ts up",
@@ -18,7 +18,9 @@
     "bots:sync": "tsx packages/bots/src/cli.ts sync",
     "secrets:scan": "tsx scripts/secret-scan.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm secrets:scan && pnpm bots:validate",
-    "worker": "pnpm --filter @boma/worker start"
+    "worker": "pnpm --filter @boma/worker start",
+    "web": "pnpm --filter @boma/web dev",
+    "simulate": "pnpm --filter @boma/worker simulate"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

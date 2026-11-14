@@ -98,6 +98,7 @@ export async function buildApp(o: AppOptions) {
     models,
     tz,
     limits,
+    simulated: Boolean(o.simulated),
   });
   const draftCreative = draftCreativeHandler({
     db: o.db,

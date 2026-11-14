@@ -60,6 +60,11 @@ export const envSchema = z.object({
       .optional(),
   ),
   TZ: z.preprocess(blankToUndefined, z.string().default("Australia/Sydney")),
+
+  OWNER_PASSWORD: z.preprocess(
+    blankToUndefined,
+    z.string().min(12, "must be at least 12 characters").optional(),
+  ),
 });
 
 export type Env = z.infer<typeof envSchema>;

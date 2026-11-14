@@ -1,4 +1,6 @@
+import { existsSync } from "node:fs";
 import { hostname } from "node:os";
+import { dirname, join } from "node:path";
 import pg from "pg";
 import { listBotFiles, loadBotFile, syncBot } from "@boma/bots";
 import { HttpTelegramApi, TelegramGateway } from "@boma/connectors";
@@ -17,7 +19,19 @@ import { loadWorkspaceConfig, syncWorkspaces } from "./workspaces";
  *   pnpm worker     — real providers + Telegram (needs keys in .env)
  *   pnpm simulate   — labelled simulation: scripted AI, A$0, Telegram optional
  */
+/** Run from the repo root so .env, config/ and bots/ resolve however the worker is started. */
+function chdirToRepoRoot() {
+  let dir = process.cwd();
+  while (!existsSync(join(dir, "pnpm-workspace.yaml"))) {
+    const up = dirname(dir);
+    if (up === dir) return;
+    dir = up;
+  }
+  process.chdir(dir);
+}
+
 async function main() {
+  chdirToRepoRoot();
   const simulated = process.env.BOMA_SIMULATION === "1";
   const loaded = loadEnv();
   const env = simulated

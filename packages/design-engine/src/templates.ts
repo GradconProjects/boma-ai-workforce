@@ -1,5 +1,5 @@
 import type { Format } from "./formats";
-import { newId } from "./ops";
+import { fitText, newId } from "./ops";
 import type { Brand, Copy, Design, Layer, ShapeLayer, TextLayer } from "./types";
 
 /**
@@ -427,13 +427,15 @@ export function buildDesign(opts: {
     width: W,
     height: H,
     background,
-    layers: layers.map((l) => ({
-      ...l,
-      x: Math.round(l.x),
-      y: Math.round(l.y),
-      w: Math.round(l.w),
-      h: Math.round(l.h),
-    })),
+    layers: layers
+      .map((l) => ({
+        ...l,
+        x: Math.round(l.x),
+        y: Math.round(l.y),
+        w: Math.round(l.w),
+        h: Math.round(l.h),
+      }))
+      .map((l) => (l.type === "text" ? fitText(l) : l)),
   };
 }
 

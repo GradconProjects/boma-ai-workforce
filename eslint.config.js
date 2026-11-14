@@ -2,7 +2,17 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["**/node_modules/**", "**/dist/**", "**/.supabase/**", "legacy/**"] },
+  {
+    ignores: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.supabase/**",
+      "legacy/**",
+      "**/.next/**",
+      "**/next-env.d.ts",
+      "apps/web/public/**",
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

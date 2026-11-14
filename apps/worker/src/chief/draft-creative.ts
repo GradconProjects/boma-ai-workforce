@@ -145,8 +145,9 @@ export function draftCreativeHandler(deps: DraftCreativeDeps): TaskHandler {
             simulated: deps.simulated,
             actor: "bot:chief-of-staff",
           });
-          const review =
-            outcome.status === "pass"
+          const review = deps.simulated
+            ? "🧪 Simulated review: no AI model wrote or checked this."
+            : outcome.status === "pass"
               ? outcome.evidenceLine
               : outcome.status === "disagreement"
                 ? `⚠️ Reviewers did not agree after 2 rounds. Unresolved: ${outcome.unresolved.map((x) => x.problem).join("; ")}`

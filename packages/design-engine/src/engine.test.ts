@@ -6,6 +6,7 @@ import {
   applyBrand,
   applyCopy,
   duplicateLayer,
+  estimateTextHeight,
   extractCopy,
   History,
   removeLayer,
@@ -110,6 +111,18 @@ describe("design engine", () => {
     expect(r.background.color).toBe("#412637");
     const head = r.layers.find((l) => l.type === "text" && l.role === "headline");
     expect(head && head.type === "text" && head.fontFamily).toBe("Fraunces");
+  });
+
+  it("long copy shrinks to fit its text box instead of overflowing", () => {
+    const d = buildDesign({ template: "bold", format: getFormat("social-square"), brand });
+    const head = d.layers.find((l) => l.type === "text" && l.role === "headline")!;
+    const long = "Show estimators how to go from drawings to a submitted tender faster than ever";
+    const out = applyCopy(d, { headline: long }).layers.find((l) => l.id === head.id)!;
+    if (out.type !== "text" || head.type !== "text") throw new Error("not text");
+    expect(out.fontSize).toBeLessThan(head.fontSize);
+    expect(estimateTextHeight(out)).toBeLessThanOrEqual(out.h);
+    const short = applyCopy(d, { headline: "Hi" }).layers.find((l) => l.id === head.id)!;
+    expect(short.type === "text" && short.fontSize).toBe(head.fontSize);
   });
 
   it("wraps text to the box width, breaking very long words", () => {

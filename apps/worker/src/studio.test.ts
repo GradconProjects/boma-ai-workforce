@@ -209,7 +209,13 @@ describe.skipIf(SKIP_DB)("Creative Studio ↔ Chief: campaign copy", () => {
     const { items } = await getCampaign(fx.pool, c.id);
     expect(items[0]!.simulated).toBe(true);
     expect(extractCopy(items[0]!.design.doc).subhead).toMatch(/Simulated copy/);
-    expect(tg.sent.slice(before).some((s) => s.text.startsWith("🧪 SIMULATION"))).toBe(true);
+    const simMsgs = tg.sent.slice(before).map((s) => s.text);
+    expect(simMsgs.some((t) => t.startsWith("🧪 SIMULATION"))).toBe(true);
+    // Never described as made or checked by Claude/OpenAI.
+    expect(simMsgs.some((t) => t.includes("Claude made") || t.includes("OpenAI checked"))).toBe(
+      false,
+    );
+    expect(simMsgs.some((t) => t.includes("Simulated review: no AI model"))).toBe(true);
     const { rows } = await fx.pool.query(
       "select coalesce(sum(amount_aud),0)::float as s from budget_ledger where kind = 'actual' and task_id = $1",
       [items[0]!.task_id],

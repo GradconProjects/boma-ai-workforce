@@ -30,6 +30,8 @@ export interface DraftPostDeps {
     chiefBotId: string;
   };
   tz: string;
+  /** Simulation mode: outputs are labelled and never described as AI-reviewed. */
+  simulated?: boolean;
 }
 
 export interface DraftPostInputs {
@@ -92,7 +94,9 @@ export function draftPostHandler(deps: DraftPostDeps): TaskHandler {
               return {
                 kind: "ready",
                 text: outcome.output.text,
-                evidence: outcome.evidenceLine,
+                evidence: deps.simulated
+                  ? "🧪 Simulated review: no AI model wrote or checked this."
+                  : outcome.evidenceLine,
                 costAud: totalCost(outcome),
               } satisfies ReviewResult;
             case "injection":
@@ -150,6 +154,7 @@ export function draftPostHandler(deps: DraftPostDeps): TaskHandler {
                   text: r.text,
                   workspace,
                   review: r.kind === "ready" ? r.evidence : r.report,
+                  simulated: Boolean(deps.simulated),
                   costAud: r.costAud,
                 },
                 policy: deps.policy,

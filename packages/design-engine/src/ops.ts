@@ -109,9 +109,49 @@ export function applyCopy(d: Design, copy: Copy): Design {
     layers: d.layers.map((l) => {
       if (l.type !== "text" || l.role === "free") return l;
       const value = copy[l.role as keyof Copy];
-      return value === undefined || value === "" ? l : { ...l, text: value };
+      return value === undefined || value === "" ? l : fitText({ ...l, text: value });
     }),
   };
+}
+
+/**
+ * Estimated rendered height of a text layer. Uses an average glyph width (0.56em, bolder and
+ * uppercase text wider) so it runs without a browser; deliberately conservative.
+ */
+export function estimateTextHeight(l: TextLayer, fontSize = l.fontSize): number {
+  const glyph =
+    fontSize * (0.5 + (l.fontWeight >= 700 ? 0.06 : 0) + (l.uppercase ? 0.08 : 0)) +
+    fontSize * l.letterSpacing;
+  const perLine = Math.max(1, Math.floor((l.w - l.padding * 2) / glyph));
+  const lines = l.text.split("\n").reduce((n, para) => {
+    let count = 1;
+    let len = 0;
+    for (const word of para.split(/\s+/).filter(Boolean)) {
+      const add = (len ? 1 : 0) + word.length;
+      if (len + add > perLine && len > 0) {
+        count++;
+        len = word.length;
+      } else len += add;
+    }
+    return n + count;
+  }, 0);
+  return lines * fontSize * l.lineHeight + l.padding * 2;
+}
+
+/** Grow a text box downwards so typed text never overflows (font size is kept). */
+export function growToFit(l: TextLayer): TextLayer {
+  const need = Math.ceil(estimateTextHeight(l));
+  return need > l.h ? { ...l, h: need } : l;
+}
+
+/** Shrink a text layer's font (down to 45% of its size) until its text fits the box height. */
+export function fitText(l: TextLayer): TextLayer {
+  if (l.background) return l; // buttons keep their size; their text is short by design
+  let size = l.fontSize;
+  const min = Math.max(8, Math.round(l.fontSize * 0.45));
+  while (size > min && estimateTextHeight(l, size) > l.h)
+    size = Math.max(min, Math.floor(size * 0.94));
+  return size === l.fontSize ? l : { ...l, fontSize: size };
 }
 
 /** Read the copy currently in a design, by role. */
