@@ -5,7 +5,7 @@ import pg from "pg";
 import { listBotFiles, loadBotFile, syncBot } from "@boma/bots";
 import { HttpTelegramApi, TelegramGateway } from "@boma/connectors";
 import { loadEnv, loadPolicy, parseEnv, redact, requireEnv } from "@boma/core";
-import { migrateUp } from "@boma/db";
+import { createPool, migrateUp } from "@boma/db";
 import { PriceTable } from "@boma/llm";
 import { seedBrands } from "@boma/studio";
 import { buildApp } from "./app";
@@ -60,7 +60,7 @@ async function main() {
   }
   if (!env.DATABASE_URL) throw new Error("DATABASE_URL is not set in .env");
   const policy = loadPolicy();
-  const db = new pg.Pool({ connectionString: env.DATABASE_URL, max: 5 });
+  const db = createPool(env.DATABASE_URL, 5);
 
   const client = await db.connect();
   try {

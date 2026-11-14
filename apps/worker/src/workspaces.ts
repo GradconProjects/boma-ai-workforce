@@ -31,7 +31,7 @@ function isValidRegex(p: string): boolean {
 export function loadWorkspaceConfig(
   path = "config/workspaces.yaml",
 ): Record<string, WorkspaceRules> {
-  const raw = parse(readFileSync(path, "utf8")) ?? {};
+  const raw = parse(readFileSync(/*turbopackIgnore: true*/ path, "utf8")) ?? {};
   return z.record(z.string().regex(/^[a-z0-9-]+$/), rulesSchema).parse(raw);
 }
 

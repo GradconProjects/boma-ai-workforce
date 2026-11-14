@@ -89,7 +89,8 @@ export function parseEnv(source: Record<string, string | undefined>): Env {
 
 /** Load .env (if present) into process.env, then parse. */
 export function loadEnv(path = ".env"): Env {
-  if (existsSync(path)) process.loadEnvFile(path);
+  if (existsSync(/*turbopackIgnore: true*/ path))
+    process.loadEnvFile(/*turbopackIgnore: true*/ path);
   return parseEnv(process.env);
 }
 

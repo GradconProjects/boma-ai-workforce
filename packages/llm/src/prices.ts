@@ -16,7 +16,9 @@ export class PriceTable {
   constructor(private table: Partial<Record<ProviderName, Record<string, ModelPrice>>>) {}
 
   static load(path = "config/prices.yaml"): PriceTable {
-    const parsed = pricesSchema.parse(parse(readFileSync(path, "utf8")) ?? {});
+    const parsed = pricesSchema.parse(
+      parse(readFileSync(/*turbopackIgnore: true*/ path, "utf8")) ?? {},
+    );
     return new PriceTable({
       anthropic: parsed.anthropic,
       openai: parsed.openai ?? {},

@@ -134,6 +134,20 @@ export class HttpTelegramApi implements TelegramApi {
       ...(text ? { text } : {}),
     });
   }
+
+  /** Point Telegram at our webhook. Telegram echoes `secretToken` in a header we verify. */
+  async setWebhook(url: string, secretToken: string): Promise<void> {
+    await this.call("setWebhook", {
+      url,
+      secret_token: secretToken,
+      allowed_updates: ["message", "callback_query"],
+    });
+  }
+
+  /** Remove the webhook (needed before local long polling works again). */
+  async deleteWebhook(): Promise<void> {
+    await this.call("deleteWebhook", {});
+  }
 }
 
 /** In-memory Telegram for tests and simulation. Records everything sent. */

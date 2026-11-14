@@ -13,7 +13,7 @@ export interface Migration {
 
 /** Reads NNNN_name.up.sql / NNNN_name.down.sql pairs. Every up must have a down. */
 export function readMigrations(dir = MIGRATIONS_DIR): Migration[] {
-  const files = readdirSync(dir);
+  const files = readdirSync(/*turbopackIgnore: true*/ dir);
   const versions = [
     ...new Set(
       files.filter((f) => f.endsWith(".up.sql")).map((f) => f.slice(0, -".up.sql".length)),
@@ -24,8 +24,8 @@ export function readMigrations(dir = MIGRATIONS_DIR): Migration[] {
     if (!files.includes(downFile)) throw new Error(`Migration ${version} has no ${downFile}`);
     return {
       version,
-      up: readFileSync(join(dir, `${version}.up.sql`), "utf8"),
-      down: readFileSync(join(dir, downFile), "utf8"),
+      up: readFileSync(/*turbopackIgnore: true*/ join(dir, `${version}.up.sql`), "utf8"),
+      down: readFileSync(/*turbopackIgnore: true*/ join(dir, downFile), "utf8"),
     };
   });
 }

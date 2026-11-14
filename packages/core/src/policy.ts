@@ -69,5 +69,5 @@ export function parsePolicy(yamlText: string): Policy {
 }
 
 export function loadPolicy(path = "config/policy.yaml"): Policy {
-  return parsePolicy(readFileSync(path, "utf8"));
+  return parsePolicy(readFileSync(/*turbopackIgnore: true*/ path, "utf8"));
 }

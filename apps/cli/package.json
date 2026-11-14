@@ -8,6 +8,8 @@
   "dependencies": {
     "@boma/bots": "workspace:*",
     "@boma/core": "workspace:*",
-    "pg": "8.23.1"
+    "pg": "8.23.1",
+    "@boma/connectors": "workspace:*",
+    "@boma/db": "workspace:*"
   }
 }

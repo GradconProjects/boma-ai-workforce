@@ -42,12 +42,12 @@ export function parseBotFile(raw: string, path = "<memory>"): BotDefinition {
 
 /** Bot files in a directory. Files starting with "_" (templates) are skipped. */
 export function listBotFiles(dir = "bots"): string[] {
-  return readdirSync(dir)
+  return readdirSync(/*turbopackIgnore: true*/ dir)
     .filter((f) => f.endsWith(".md") && !f.startsWith("_"))
     .sort()
-    .map((f) => join(dir, f));
+    .map((f) => join(/*turbopackIgnore: true*/ dir, f));
 }
 
 export function loadBotFile(path: string): BotDefinition {
-  return parseBotFile(readFileSync(path, "utf8"), path);
+  return parseBotFile(readFileSync(/*turbopackIgnore: true*/ path, "utf8"), path);
 }

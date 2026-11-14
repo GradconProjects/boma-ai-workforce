@@ -6,12 +6,15 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import pg from "pg";
 import { loadPolicy, parseEnv, type Env, type Policy } from "@boma/core";
+import { createPool } from "@boma/db";
 
 /** Server-only helpers: env (repo-root .env), database pool, policy, owner session. */
 
-const ROOT = resolve(
-  process.cwd(),
-  existsSync(resolve(process.cwd(), "config/policy.yaml")) ? "." : "../..",
+export const ROOT = resolve(
+  /*turbopackIgnore: true*/ process.cwd(),
+  existsSync(resolve(/*turbopackIgnore: true*/ process.cwd(), "config/policy.yaml"))
+    ? "."
+    : "../..",
 );
 
 let envCache: Env | undefined;
@@ -30,7 +33,7 @@ export function db(): pg.Pool {
   if (!g.__bomaPool) {
     const url = env().DATABASE_URL;
     if (!url) throw new Error("DATABASE_URL is not set in .env");
-    g.__bomaPool = new pg.Pool({ connectionString: url, max: 5 });
+    g.__bomaPool = createPool(url, 3);
   }
   return g.__bomaPool;
 }

@@ -19,7 +19,9 @@
     "pg": "8.23.1",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "server-only": "0.0.1"
+    "server-only": "0.0.1",
+    "@boma/worker": "workspace:*",
+    "@boma/connectors": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.5",

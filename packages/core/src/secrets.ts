@@ -24,7 +24,7 @@ export const SECRET_PATTERNS: SecretPattern[] = [
   // A long opaque value assigned to a secret-looking name: api_key: "...", TOKEN=...
   {
     name: "generic_secret_assignment",
-    re: /\b[A-Za-z_]*(?:SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)[A-Za-z_]*\s*[:=]\s*["']?[A-Za-z0-9+/_.-]{24,}/i,
+    re: /\b[A-Za-z_]*(?:SECRET|TOKEN|API_KEY|PASSWORD|PRIVATE_KEY)[A-Za-z_]*\s*[:=]\s*["']?(?!process\.env\b|env\.|import\.meta\b)[A-Za-z0-9+/_.-]{24,}/i,
   },
 ];
 

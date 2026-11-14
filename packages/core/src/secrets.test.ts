@@ -14,6 +14,8 @@ describe("secret detection", () => {
       "maker: { provider: anthropic, model_env: ANTHROPIC_MODEL_MAKER }",
       'schedule: ["0 6 * * *"]      # daily token health check',
       "DATABASE_URL=postgres://postgres:postgres@localhost:5432/boma",
+      "const token = process.env.TELEGRAM_BOT_TOKEN;",
+      "const secret = env.TELEGRAM_WEBHOOK_SECRET_VALUE_NAME;",
     ].join("\n");
     expect(findSecrets(text)).toEqual([]);
   });

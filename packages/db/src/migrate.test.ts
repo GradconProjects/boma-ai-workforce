@@ -24,6 +24,7 @@ const EXPECTED_TABLES = [
   "system_state",
   "task_events",
   "tasks",
+  "uploads",
   "workspaces",
 ];
 

@@ -56,6 +56,18 @@ export class TelegramGateway {
     return handled;
   }
 
+  /**
+   * Webhook delivery (hosted mode). Telegram may redeliver an update; anything at or below the
+   * last processed update_id is ignored, so nothing is handled twice.
+   */
+  async handleWebhook(u: TgUpdate): Promise<"handled" | "duplicate"> {
+    const last = (await getState<number>(this.db, "telegram_last_update")) ?? -1;
+    if (u.update_id <= last) return "duplicate";
+    await setState(this.db, "telegram_last_update", u.update_id);
+    await this.handle(u);
+    return "handled";
+  }
+
   async handle(u: TgUpdate): Promise<void> {
     const from = u.message?.from ?? u.callback_query?.from;
     if (!from || from.id !== this.ownerId) {

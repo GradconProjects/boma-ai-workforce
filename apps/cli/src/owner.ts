@@ -1,7 +1,9 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { createInterface } from "node:readline/promises";
-import pg from "pg";
+import type pg from "pg";
+import { createPool } from "@boma/db";
+import { HttpTelegramApi } from "@boma/connectors";
 import {
   audit,
   budgetStatus,
@@ -265,6 +267,32 @@ export async function runOwnerCommand(
       return;
     }
 
+    case "telegram": {
+      // owner telegram webhook <https://your-app.vercel.app>   |   owner telegram polling
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      if (!token) throw new OwnerCliError("TELEGRAM_BOT_TOKEN is not set in your local .env");
+      const api = new HttpTelegramApi(token);
+      if (sub === "webhook") {
+        const base = p[2]?.replace(/\/$/, "");
+        const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+        if (!base || !/^https:\/\//.test(base))
+          throw new OwnerCliError("Usage: owner telegram webhook https://<your-app>.vercel.app");
+        if (!secret)
+          throw new OwnerCliError(
+            "TELEGRAM_WEBHOOK_SECRET must be set locally to the same value as on Vercel",
+          );
+        await api.setWebhook(`${base}/api/telegram`, secret);
+        out(`Telegram now delivers to ${base}/api/telegram (hosted mode). Stop any local worker.`);
+      } else if (sub === "polling") {
+        await api.deleteWebhook();
+        out("Webhook removed: the local worker (pnpm worker) can long-poll Telegram again.");
+      } else
+        throw new OwnerCliError(
+          "Usage: owner telegram webhook <https-url> | owner telegram polling",
+        );
+      return;
+    }
+
     default:
       out(
         [
@@ -275,6 +303,7 @@ export async function runOwnerCommand(
           '  account add <slug> <kind> "<label>" [--workspace ws]',
           "  grant <bot> <account> | revoke <bot> <account>",
           "  budget set <company|bot:<slug>|dual-review> <aud> [--warn aud]",
+          "  telegram webhook <https-url> | telegram polling",
           "Add --yes to skip confirmation.",
         ].join("\n"),
       );
@@ -284,7 +313,7 @@ export async function runOwnerCommand(
 async function main() {
   chdirToRepoRoot();
   const env = requireEnv(loadEnv(), ["DATABASE_URL"]);
-  const db = new pg.Pool({ connectionString: env.DATABASE_URL, max: 2 });
+  const db = createPool(env.DATABASE_URL, 2);
   try {
     await runOwnerCommand(db, loadPolicy(), process.argv.slice(2));
   } catch (err) {

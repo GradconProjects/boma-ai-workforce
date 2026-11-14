@@ -1,19 +1,10 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { NextResponse } from "next/server";
-import { isOwner } from "@/lib/server";
+import { db, isOwner } from "@/lib/server";
 
 /**
- * Owner image uploads for the editor's image library. Stored under public/uploads (git-ignored)
- * in local-first mode; swap for Supabase Storage when hosted.
+ * Owner image uploads for the editor's image library, stored in Postgres so they work on
+ * serverless hosting (no local disk) without extra storage credentials.
  */
-const DIR = join(process.cwd(), "public", "uploads");
-const TYPES: Record<string, string> = {
-  "image/png": "png",
-  "image/jpeg": "jpg",
-  "image/webp": "webp",
-};
 const MAX_BYTES = 10 * 1024 * 1024;
 
 // Magic numbers: never trust the declared content type alone.
@@ -28,13 +19,11 @@ function sniff(buf: Buffer): string | null {
 
 export async function GET() {
   if (!(await isOwner())) return NextResponse.json({ error: "unauthorised" }, { status: 401 });
-  await mkdir(DIR, { recursive: true });
-  const names = (await readdir(DIR)).filter((n) => /\.(png|jpe?g|webp)$/i.test(n));
-  const files = await Promise.all(
-    names.map(async (n) => ({ n, t: (await stat(join(DIR, n))).mtimeMs })),
+  const { rows } = await db().query<{ id: string; filename: string }>(
+    "select id, filename from uploads order by created_at desc limit 200",
   );
   return NextResponse.json({
-    images: files.sort((a, b) => b.t - a.t).map((f) => ({ src: `/uploads/${f.n}`, label: f.n })),
+    images: rows.map((r) => ({ src: `/api/uploads/${r.id}`, label: r.filename })),
   });
 }
 
@@ -46,11 +35,12 @@ export async function POST(req: Request) {
   if (file.size > MAX_BYTES)
     return NextResponse.json({ error: "Images must be 10 MB or smaller" }, { status: 413 });
   const buf = Buffer.from(await file.arrayBuffer());
-  const type = sniff(buf);
-  if (!type || !TYPES[type])
-    return NextResponse.json({ error: "Only PNG, JPEG or WebP images" }, { status: 415 });
-  await mkdir(DIR, { recursive: true });
-  const name = `${randomUUID()}.${TYPES[type]}`;
-  await writeFile(join(DIR, name), buf);
-  return NextResponse.json({ src: `/uploads/${name}` });
+  const mime = sniff(buf);
+  if (!mime) return NextResponse.json({ error: "Only PNG, JPEG or WebP images" }, { status: 415 });
+  const name = file.name.replace(/[^\w.\- ]+/g, "").slice(0, 120) || "image";
+  const { rows } = await db().query<{ id: string }>(
+    "insert into uploads (filename, mime, size_bytes, bytes) values ($1, $2, $3, $4) returning id",
+    [name, mime, buf.length, buf],
+  );
+  return NextResponse.json({ src: `/api/uploads/${rows[0]!.id}` });
 }

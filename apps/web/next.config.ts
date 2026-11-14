@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import type { NextConfig } from "next";
 
 const config: NextConfig = {
@@ -8,11 +9,21 @@ const config: NextConfig = {
     "@boma/bots",
     "@boma/design-engine",
     "@boma/studio",
+    "@boma/llm",
+    "@boma/review",
+    "@boma/connectors",
+    "@boma/worker",
   ],
   serverExternalPackages: ["pg"],
   poweredByHeader: false,
   devIndicators: false,
-  experimental: { serverActions: { bodySizeLimit: "4mb" } },
+  experimental: { serverActions: { bodySizeLimit: "12mb" } },
+  // Monorepo: trace from the repo root and ship the runtime config, bot files and migrations
+  // that the server reads from disk (they are not imported, so tracing can't find them alone).
+  outputFileTracingRoot: resolve(import.meta.dirname, "../.."),
+  outputFileTracingIncludes: {
+    "/**": ["../../config/**", "../../bots/**", "../../packages/db/migrations/**"],
+  },
 };
 
 export default config;
