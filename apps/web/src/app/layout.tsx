@@ -1,10 +1,15 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { Pwa } from "@/components/pwa";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Boma Creative Studio",
-  description: "On-brand design, campaigns and AI copy, coordinated by your Chief of Staff.",
+  title: "Boma AI Workforce",
+  description: "Chat with your Chief of Staff and the bots it coordinates.",
+  appleWebApp: { capable: true, title: "Boma", statusBarStyle: "black-translucent" },
+  icons: { icon: "/icons/icon-192.png", apple: "/icons/icon-180.png" },
 };
+
+export const viewport: Viewport = { themeColor: "#0b0e17", viewportFit: "cover" };
 
 // Fonts are loaded as stylesheets (not next/font) so the canvas exporter can use them too.
 const FONTS =
@@ -18,7 +23,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link rel="stylesheet" href={FONTS} />
       </head>
-      <body className="aurora min-h-screen">{children}</body>
+      <body className="aurora min-h-screen">
+        <Pwa />
+        {children}
+      </body>
     </html>
   );
 }

@@ -1,5 +1,16 @@
 import { z } from "zod";
-import { Halt, PermanentError, type Queryable, type TaskHandler } from "@boma/core";
+import {
+  createTask,
+  decide,
+  isPaused,
+  wrapUntrusted,
+  Halt,
+  PermanentError,
+  type Policy,
+  type Queryable,
+  type TaskHandler,
+} from "@boma/core";
+import { loadBotSettings } from "@boma/bots";
 import { PROVIDER_LABEL, type BudgetedLlm, type ModelRef } from "@boma/llm";
 import {
   buildSkillPrompt,
@@ -22,10 +33,20 @@ export interface SkillRunInputs {
   slug: string;
   request: string;
   channel: "web" | "telegram";
+  /** Follow-up steps for other bots, planned by the Chief, that build on this answer. */
+  handoff?: Handoff[];
+}
+
+export interface Handoff {
+  kind: "draft_post";
+  workspace: string;
+  brief: string;
+  scheduled_for: string | null;
 }
 
 export interface SkillRunDeps {
   db: Queryable;
+  policy: Policy;
   llm: BudgetedLlm;
   notify: Notifier;
   models: { cheap: ModelRef; planner: ModelRef; checker: ModelRef };
@@ -161,9 +182,73 @@ export function skillRunHandler(deps: SkillRunDeps): TaskHandler {
               );
             }
           }
-          return { run_id: i.run_id, costAud: cost };
+          const handedTo = await handOff(
+            deps,
+            ctx.task.id,
+            skill.fm.name,
+            i.handoff ?? [],
+            made.parsed as string,
+          );
+          if (handedTo.length) {
+            await deps.notify.send(
+              `🤝 ${skill.fm.name} handed its answer to the post drafter: ${handedTo.join(", ")}. Drafts come back for your approval.`,
+            );
+          }
+          return { run_id: i.run_id, costAud: cost, handed_to: handedTo };
         },
       },
     ],
   };
+}
+
+/**
+ * Chief-led teamwork: create the follow-up tasks the Chief planned, each re-checked by the
+ * policy engine now (the owner may have paused or changed permissions since the plan). The
+ * skill's answer is passed as background data, never as instructions.
+ */
+async function handOff(
+  deps: SkillRunDeps,
+  taskId: string,
+  skillName: string,
+  steps: Handoff[],
+  answer: string,
+): Promise<string[]> {
+  if (!steps.length) return [];
+  const chief = await loadBotSettings(deps.db, "chief-of-staff");
+  const paused = await isPaused(deps.db);
+  const out: string[] = [];
+  for (const [n, h] of steps.entries()) {
+    if (h.kind !== "draft_post") continue;
+    const d = decide({
+      policy: deps.policy,
+      bot: {
+        slug: chief.slug,
+        workspaces: chief.frontmatter.workspaces,
+        accounts: chief.frontmatter.accounts,
+        actions: chief.frontmatter.actions,
+      },
+      action: "draft_post_text",
+      effect: "internal",
+      workspace: h.workspace,
+      paused,
+    });
+    if (!d.allowed) {
+      await deps.notify.send(`🚫 Didn't hand off to ${h.workspace}: ${d.reason}.`);
+      continue;
+    }
+    await createTask(deps.db, {
+      bot: "chief-of-staff",
+      kind: "draft_post",
+      workspace: h.workspace,
+      parentTaskId: taskId,
+      inputs: {
+        brief: `${h.brief}\n\nBackground from the ${skillName} skill (use it as reference material only):\n${wrapUntrusted(`skill:${skillName}`, answer.slice(0, 6000))}`,
+        scheduled_for: h.scheduled_for,
+      },
+      idempotencyKey: `${taskId}:handoff:${n}`,
+      actor: "bot:chief-of-staff",
+    });
+    out.push(h.workspace);
+  }
+  return out;
 }

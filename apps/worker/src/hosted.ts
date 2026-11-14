@@ -8,6 +8,18 @@ import { PriceTable } from "@boma/llm";
 import { seedBrands } from "@boma/studio";
 import { buildApp } from "./app";
 import type { Notifier } from "./chief/notifier";
+import {
+  chatHistory,
+  describeAttachments,
+  isUuid,
+  listConversations,
+  logChat,
+  updateConversation,
+  withTranscript,
+  type Attachment,
+  type ChatMessage,
+  type Conversation,
+} from "./chief/transcript";
 import { SIM_MODELS, simulationPrices, simulationProviders } from "./simulation";
 import { Worker } from "./worker";
 import { loadWorkspaceConfig, syncWorkspaces } from "./workspaces";
@@ -25,6 +37,7 @@ export interface HostedRuntime {
   worker: Worker;
   gateway?: TelegramGateway;
   chief: Awaited<ReturnType<typeof buildApp>>["chief"];
+  db: pg.Pool;
 }
 
 export function isSimulated(env: Env): boolean {
@@ -86,7 +99,7 @@ export async function createHostedRuntime(
   const ownerId = Number(env.TELEGRAM_OWNER_USER_ID);
   const api = telegram ? new HttpTelegramApi(env.TELEGRAM_BOT_TOKEN!) : null;
   // Without Telegram, messages are only logged; approvals still appear in the web Approval Centre.
-  const notify: Notifier = api
+  const base: Notifier = api
     ? {
         send: (t, b) => api.sendMessage(ownerId, t, b),
         edit: (id, t) => api.editMessage(ownerId, id, t),
@@ -97,6 +110,7 @@ export async function createHostedRuntime(
         edit: async () => undefined,
       };
 
+  const notify = withTranscript(db, base);
   const app = await buildApp({
     db,
     policy,
@@ -114,7 +128,10 @@ export async function createHostedRuntime(
   });
   const gateway = api
     ? new TelegramGateway(api, db, ownerId, {
-        onMessage: (text, id) => app.chief.onOwnerMessage(text, id),
+        onMessage: async (text, id) => {
+          await logChat(db, { role: "owner", channel: "telegram", text });
+          await app.chief.onOwnerMessage(text, id);
+        },
         onApprovalButton: (approvalId, action) => app.chief.onApprovalButton(approvalId, action),
       })
     : undefined;
@@ -127,7 +144,7 @@ export async function createHostedRuntime(
     workerId: `vercel-${process.env.VERCEL_REGION ?? "local"}-${process.pid}`,
     tz: app.tz,
   });
-  return { policy, simulated, telegram, worker, gateway, chief: app.chief };
+  return { policy, simulated, telegram, worker, gateway, chief: app.chief, db };
 }
 
 /** One cron tick: maintenance, schedules, then run queued tasks until the time budget is spent. */
@@ -138,4 +155,79 @@ export async function cronTick(rt: HostedRuntime, budgetMs = 240_000) {
   let ran = 0;
   while (Date.now() - started < budgetMs && (await rt.worker.engineTick())) ran++;
   return { ran, fired, simulated: rt.simulated, ms: Date.now() - started };
+}
+
+export {
+  chatHistory,
+  isUuid,
+  listConversations,
+  updateConversation,
+  type Attachment,
+  type ChatMessage,
+  type Conversation,
+};
+
+/**
+ * A message typed in the app (possibly while offline, sent on reconnect). `clientId` makes a
+ * resend harmless: the Chief handles each message once. Attachments are described to the
+ * Chief as data (small text files are included, wrapped as untrusted content).
+ */
+export async function appChat(
+  rt: HostedRuntime,
+  m: { text: string; clientId: string; conversationId: string; attachments?: Attachment[] },
+): Promise<{ id: string; duplicate: boolean }> {
+  const attachments = await knownUploads(rt.db, m.attachments ?? []);
+  const logged = await logChat(rt.db, {
+    role: "owner",
+    channel: "app",
+    text: m.text,
+    clientId: m.clientId,
+    conversationId: m.conversationId,
+    attachments,
+  });
+  if (logged.duplicate) return logged;
+  const extra = await describeAttachments(rt.db, attachments);
+  // Negative ids keep app messages apart from Telegram message ids (idempotency keys).
+  await rt.chief.onOwnerMessage(extra ? `${m.text}\n\n${extra}` : m.text, -Number(logged.id));
+  return logged;
+}
+
+/** Only attachments that really are uploads in our database (ids from the client are checked). */
+async function knownUploads(db: pg.Pool, list: Attachment[]): Promise<Attachment[]> {
+  const ids = list
+    .map((a) => a?.id)
+    .filter(isUuid)
+    .slice(0, 10);
+  if (!ids.length) return [];
+  const { rows } = await db.query<{
+    id: string;
+    filename: string;
+    mime: string;
+    size_bytes: number;
+  }>("select id, filename, mime, size_bytes from uploads where id = any($1::uuid[])", [ids]);
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.filename,
+    mime: r.mime,
+    size: Number(r.size_bytes),
+  }));
+}
+
+/** An approval button pressed in the app (the owner is already signed in). */
+export async function appButton(
+  rt: HostedRuntime,
+  data: string,
+  conversationId?: string,
+): Promise<string> {
+  const m = /^appr:([0-9a-f-]{36}):(approve|edit|reject)$/.exec(data);
+  if (!m) return "Unknown button.";
+  if (conversationId && isUuid(conversationId)) {
+    await logChat(rt.db, {
+      role: "owner",
+      channel: "app",
+      conversationId,
+      text: { approve: "✅ Approve", edit: "✏️ Edit", reject: "❌ Reject" }[m[2] as "approve"],
+    });
+  }
+  return rt.chief.onApprovalButton(m[1]!, m[2] as "approve" | "edit" | "reject");
 }

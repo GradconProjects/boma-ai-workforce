@@ -15,6 +15,8 @@ const EXPECTED_TABLES = [
   "budget_limits",
   "campaign_items",
   "campaigns",
+  "chat_conversations",
+  "chat_messages",
   "design_versions",
   "designs",
   "memory",

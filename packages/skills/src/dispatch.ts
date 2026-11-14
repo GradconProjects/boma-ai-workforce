@@ -33,6 +33,9 @@ export async function dispatchSkill(
     channel: UnlockChannel;
     idempotencyKey: string;
     actor: string;
+    /** Follow-up work for other bots once this skill has answered (Chief-led teamwork). */
+    handoff?: unknown[];
+    workspace?: string | null;
   },
 ): Promise<DispatchResult> {
   const { skill } = o;
@@ -70,7 +73,14 @@ export async function dispatchSkill(
   const { task, created } = await createTask(db, {
     bot: "chief-of-staff",
     kind: "skill_run",
-    inputs: { run_id: runId, slug: skill.fm.slug, request: o.request, channel: o.channel },
+    workspace: o.workspace ?? null,
+    inputs: {
+      run_id: runId,
+      slug: skill.fm.slug,
+      request: o.request,
+      channel: o.channel,
+      ...(o.handoff?.length ? { handoff: o.handoff } : {}),
+    },
     idempotencyKey: o.idempotencyKey,
     estCostAud: estimateAud,
     actor: o.actor,

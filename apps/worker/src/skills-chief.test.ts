@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { MockTelegramApi, TelegramGateway } from "@boma/connectors";
-import { parseEnv, resumeAll } from "@boma/core";
+import { parseEnv, resumeAll, setState } from "@boma/core";
 import { MockProvider, PriceTable, type LlmRequest } from "@boma/llm";
 import { repoPath, setupDb, SKIP_DB, type Fixture } from "../../../test/fixture";
 import { buildApp } from "./app";
@@ -47,6 +47,7 @@ describe.skipIf(SKIP_DB)("skills through the Chief", () => {
   let worker: Worker;
   let anthropic: MockProvider;
   let classification: unknown;
+  let plan: unknown;
   let msgId = 5000;
 
   const say = (text: string) =>
@@ -82,12 +83,28 @@ describe.skipIf(SKIP_DB)("skills through the Chief", () => {
     anthropic = new MockProvider("anthropic", (req: LlmRequest) => {
       if (req.schemaName === "classification") return { json: classification };
       if (req.schemaName === "answer") return { json: { answer: "All quiet." } };
+      if (req.schemaName === "plan") return { json: plan };
+      if (req.schemaName === "maker_output")
+        return {
+          json: { text: "Spring is inspection season. Book a same-day photo report.", claims: [] },
+        };
       if (!req.schema) return { text: `SKILL ANSWER for: ${req.input.slice(-60)}` };
       throw new Error(`unexpected call ${req.schemaName}`);
     });
-    const openai = new MockProvider("openai", () => ({
-      json: { verdict: "sound", issues: [], summary: "Checked: fine." },
-    }));
+    const openai = new MockProvider("openai", (req: LlmRequest) =>
+      req.schemaName === "critique"
+        ? { json: { verdict: "sound", issues: [], summary: "Checked: fine." } }
+        : {
+            json: {
+              verdict: "pass",
+              score: 90,
+              issues: [],
+              claims_checked: [],
+              injection_detected: false,
+              summary: "Good.",
+            },
+          },
+    );
     tg = new MockTelegramApi();
     const notify: Notifier = {
       send: (t, b) => tg.sendMessage(OWNER, t, b),
@@ -205,5 +222,103 @@ describe.skipIf(SKIP_DB)("skills through the Chief", () => {
     await say("/skills");
     expect(texts()).toMatch(/Skills library/);
     expect(texts()).toMatch(/the-council ⏹ off/);
+  });
+
+  it("Chief-led teamwork: a skill answers first, then hands its answer to the post drafter", async () => {
+    classification = { ...(classification as object), intent: "new_job" };
+    plan = {
+      reply: "Strategy first, then a post built on it.",
+      tasks: [
+        {
+          kind: "skill_run",
+          skill: "content-strategist",
+          workspace: "ongroundpm",
+          brief: "Spring content angles for landlords who live away",
+          scheduled_for: null,
+          uses_output_of: null,
+        },
+        {
+          kind: "draft_post",
+          skill: null,
+          workspace: "ongroundpm",
+          brief: "One Facebook post using the best angle",
+          scheduled_for: null,
+          uses_output_of: 0,
+        },
+        {
+          kind: "skill_run",
+          skill: "make-everyone-admin",
+          workspace: "ongroundpm",
+          brief: "x",
+          scheduled_for: null,
+          uses_output_of: null,
+        },
+      ],
+      unsupported: [],
+      permission_changes_requested: [],
+    };
+    await say("Plan some spring content for OnGroundPM and then draft a post from it");
+    expect(texts()).toMatch(/Content Strategist/);
+    expect(texts()).toMatch(/↳ then Draft post · ongroundpm/);
+    expect(texts()).toMatch(/isn't an available skill/);
+    // The post isn't created until the skill has answered.
+    const before = await fx.pool.query(
+      "select count(*)::int as n from tasks where kind = 'draft_post' and status not in ('cancelled')",
+    );
+    await runAll();
+    expect(texts()).toMatch(/handed its answer to the post drafter: ongroundpm/);
+    const child = await fx.pool.query(
+      "select t.inputs, t.status, p.kind as parent_kind from tasks t join tasks p on p.id = t.parent_task_id where t.kind = 'draft_post' order by t.created_at desc limit 1",
+    );
+    expect(child.rows[0].parent_kind).toBe("skill_run");
+    expect(child.rows[0].inputs.brief).toContain("<untrusted_data");
+    expect(child.rows[0].status).toBe("awaiting_approval");
+    const after = await fx.pool.query(
+      "select count(*)::int as n from tasks where kind = 'draft_post' and status not in ('cancelled')",
+    );
+    expect(after.rows[0].n).toBe(before.rows[0].n + 1);
+  });
+
+  it("the handoff is re-checked by the policy engine when it happens", async () => {
+    classification = { ...(classification as object), intent: "new_job" };
+    plan = {
+      reply: "ok",
+      tasks: [
+        {
+          kind: "skill_run",
+          skill: "the-council",
+          workspace: "ongroundpm",
+          brief: "angles?",
+          scheduled_for: null,
+          uses_output_of: null,
+        },
+        {
+          kind: "draft_post",
+          skill: null,
+          workspace: "ongroundpm",
+          brief: "post",
+          scheduled_for: null,
+          uses_output_of: 0,
+        },
+      ],
+      unsupported: [],
+      permission_changes_requested: [],
+    };
+    await say("think it through and then write the post");
+    // The owner pauses everything while the skill is still answering.
+    anthropic.setHandler(async (req: LlmRequest) => {
+      if (!req.schema) {
+        await setState(fx.pool, "paused", true);
+        return { text: "Council verdict: go." };
+      }
+      throw new Error(`unexpected call ${req.schemaName}`);
+    });
+    await runAll();
+    await setState(fx.pool, "paused", false);
+    expect(texts()).toMatch(/Didn't hand off to ongroundpm/);
+    const kids = await fx.pool.query(
+      "select count(*)::int as n from tasks t join tasks p on p.id = t.parent_task_id where p.inputs->>'request' = 'angles?'",
+    );
+    expect(kids.rows[0].n).toBe(0);
   });
 });

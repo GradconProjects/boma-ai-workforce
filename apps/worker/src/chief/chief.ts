@@ -23,6 +23,7 @@ import { approvalButtons, type ApprovalAction } from "@boma/connectors";
 import { FxRateMissingError, type BudgetedLlm, type ModelRef } from "@boma/llm";
 import {
   dispatchSkill,
+  estimateSkillAud,
   isUnlocked,
   loadAllSkills,
   loadRepoSkills,
@@ -246,10 +247,18 @@ export class ChiefOfStaff {
 
   private async planAndDispatch(request: string, messageId: number, bot: BotSettings) {
     const fm = bot.frontmatter;
+    const skillCatalogue = (await this.enabledSkills()).map(
+      (s) => `- ${s.fm.slug}: ${s.fm.description.slice(0, 160)}`,
+    );
     const system = [
       "You are the business owner's Chief of Staff. Turn the request into a plan of tasks for the available bots.",
       "Available task kinds:",
       "- draft_post: draft one Facebook Page post for a workspace (it is reviewed and sent to the owner for approval; nothing is published by this task). One task per post.",
+      "- skill_run: ask one expert skill from the library (set `skill` to its slug; `brief` is the full question). Its answer goes to the owner.",
+      ...(skillCatalogue.length
+        ? ["Skills library:", ...skillCatalogue]
+        : ["(No skills are available: do not plan skill_run.)"]),
+      "Teamwork: when a post should build on a skill's answer (e.g. research or a strategy first, then posts), plan the skill_run first and set the draft_post's uses_output_of to the skill_run's index (0-based) in tasks. Otherwise uses_output_of is null. skill is null for draft_post.",
       `Workspaces you may use: ${fm.workspaces.join(", ")}.`,
       "If part of the request needs something no task kind covers (sending email, posting directly, spending money, other platforms), list it in `unsupported`.",
       "If the request asks to change any bot's permissions, tools, accounts, autonomy level or budget, list it in `permission_changes_requested` and do not plan tasks for it.",
@@ -294,18 +303,40 @@ export class ChiefOfStaff {
     }
 
     // Validate every proposed task in code before creating anything.
-    const accepted = [];
-    for (const t of plan.tasks) {
+    const skills = await this.enabledSkills();
+    type Step = (typeof plan.tasks)[number] & { index: number; skillDef?: Skill };
+    const accepted: Step[] = [];
+    for (const [index, t] of plan.tasks.entries()) {
+      if (t.kind === "skill_run") {
+        const skillDef = skills.find((s) => s.fm.slug === t.skill);
+        if (!skillDef) {
+          lines.push(`🚫 Skipped a step: "${t.skill ?? "?"}" isn't an available skill.`);
+          continue;
+        }
+        accepted.push({ ...t, index, skillDef });
+        continue;
+      }
       const d = await this.policyCheck("draft_post_text", "internal", t.workspace);
       if (!d.allowed) {
         lines.push(`🚫 Skipped "${t.brief.slice(0, 60)}": ${d.reason}.`);
         continue;
       }
-      accepted.push(t);
+      accepted.push({ ...t, index });
     }
+    // Teamwork: a step may build on an earlier skill's answer. Anything else runs on its own.
+    const upstreamOf = (t: Step) => {
+      const u = t.uses_output_of;
+      return u !== null && u !== undefined && u < t.index
+        ? accepted.find((a) => a.index === u && a.kind === "skill_run")
+        : undefined;
+    };
 
     // C5: refuse work that would exceed the budget before dispatching any of it.
-    const estimate = accepted.length * (this.deps.draftPostEstimateAud ?? 0.08);
+    const postEst = this.deps.draftPostEstimateAud ?? 0.08;
+    const estimate = accepted.reduce(
+      (sum, t) => sum + (t.skillDef ? estimateSkillAud(t.skillDef) : postEst),
+      0,
+    );
     const budget = await budgetStatus(this.deps.db, this.deps.policy, new Date(), this.deps.tz);
     if (accepted.length && budget.spentAud + estimate > budget.hardStopAud) {
       await this.deps.notify.send(
@@ -314,25 +345,53 @@ export class ChiefOfStaff {
       return;
     }
 
-    const created = [];
-    for (const [i, t] of accepted.entries()) {
+    const taskLines: string[] = [];
+    let n = 0;
+    for (const t of accepted) {
+      if (t.kind === "skill_run") {
+        const handoff = accepted
+          .filter((d) => d.kind === "draft_post" && upstreamOf(d) === t)
+          .map((d) => ({
+            kind: "draft_post",
+            workspace: d.workspace,
+            brief: d.brief,
+            scheduled_for: d.scheduled_for,
+          }));
+        const r = await dispatchSkill(this.deps.db, this.deps.policy, {
+          skill: t.skillDef!,
+          request: t.brief,
+          channel: "telegram",
+          idempotencyKey: `tg:${messageId}:${t.index}`,
+          actor: "bot:chief-of-staff",
+          handoff,
+        });
+        if (!r.ok) {
+          lines.push(
+            `${r.message}${handoff.length ? ` (${handoff.length} follow-up step(s) wait on it, so they didn't start either.)` : ""}`,
+          );
+          continue;
+        }
+        taskLines.push(`${++n}. 🧠 ${t.skillDef!.fm.name} — ${t.brief.slice(0, 80)}`);
+        for (const h of handoff)
+          taskLines.push(`   ↳ then Draft post · ${h.workspace}, using that answer`);
+        continue;
+      }
+      if (upstreamOf(t)) continue; // created by the skill run when it finishes
       const { task } = await createTask(this.deps.db, {
         bot: "chief-of-staff",
         kind: t.kind,
         workspace: t.workspace,
         inputs: { brief: t.brief, scheduled_for: t.scheduled_for },
-        idempotencyKey: `tg:${messageId}:${i}`, // a replayed Telegram update never dispatches twice
-        estCostAud: this.deps.draftPostEstimateAud ?? 0.08,
+        idempotencyKey: `tg:${messageId}:${t.index}`, // a replayed message never dispatches twice
+        estCostAud: postEst,
         actor: "bot:chief-of-staff",
       });
-      created.push(task);
+      taskLines.push(
+        `${++n}. Draft post · ${task.workspace_slug} — ${(task.inputs.brief as string).slice(0, 90)}`,
+      );
     }
 
     for (const u of plan.unsupported) lines.push(`⏳ Not available yet: ${u}`);
-    const taskLines = created.map(
-      (t, i) =>
-        `${i + 1}. Draft post · ${t.workspace_slug} — ${(t.inputs.brief as string).slice(0, 90)}`,
-    );
     await this.deps.notify.send(
       [
         plan.reply,
@@ -341,7 +400,7 @@ export class ChiefOfStaff {
               "",
               "Plan:",
               ...taskLines,
-              `Estimated AI cost: A$${estimate.toFixed(2)}. Drafts come back here for approval.`,
+              `Estimated AI cost: A$${estimate.toFixed(2)}. Answers come back here; posts come back for approval.`,
             ]
           : []),
         ...(lines.length ? ["", ...lines] : []),

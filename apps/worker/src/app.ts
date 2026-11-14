@@ -136,6 +136,7 @@ export async function buildApp(o: AppOptions) {
   });
   const skillRun = skillRunHandler({
     db: o.db,
+    policy: o.policy,
     llm,
     notify: o.notify,
     models,

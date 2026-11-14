@@ -11,7 +11,7 @@ export const classifySchema = z.object({
 export type Classification = z.infer<typeof classifySchema>;
 
 /** Task kinds the Chief can dispatch in this release. */
-export const DISPATCHABLE_KINDS = ["draft_post"] as const;
+export const DISPATCHABLE_KINDS = ["draft_post", "skill_run"] as const;
 
 export const planSchema = z.object({
   reply: z.string(),
@@ -21,6 +21,10 @@ export const planSchema = z.object({
       workspace: z.string(),
       brief: z.string(),
       scheduled_for: z.string().nullable(),
+      /** skill_run only: which library skill. */
+      skill: z.string().nullable().optional(),
+      /** Index of an earlier skill_run task in this plan whose answer this task builds on. */
+      uses_output_of: z.number().int().nullable().optional(),
     }),
   ),
   /** Parts of the request no available bot can do yet. */

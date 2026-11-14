@@ -10,6 +10,7 @@ import { PriceTable } from "@boma/llm";
 import { seedBrands } from "@boma/studio";
 import { buildApp } from "./app";
 import { ConsoleNotifier, type Notifier } from "./chief/notifier";
+import { logChat, withTranscript } from "./chief/transcript";
 import { SIM_MODELS, simulationPrices, simulationProviders } from "./simulation";
 import { Worker } from "./worker";
 import { loadWorkspaceConfig, syncWorkspaces } from "./workspaces";
@@ -79,7 +80,7 @@ async function main() {
   const useTelegram = Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_OWNER_USER_ID);
   const ownerId = Number(env.TELEGRAM_OWNER_USER_ID);
   const api = useTelegram ? new HttpTelegramApi(env.TELEGRAM_BOT_TOKEN!) : null;
-  const notify: Notifier = api
+  const base: Notifier = api
     ? {
         send: (text, buttons) => api.sendMessage(ownerId, text, buttons),
         edit: (id, text) => api.editMessage(ownerId, id, text),
@@ -87,6 +88,7 @@ async function main() {
       }
     : new ConsoleNotifier();
 
+  const notify = withTranscript(db, base);
   const app = await buildApp({
     db,
     policy,
@@ -98,7 +100,10 @@ async function main() {
   });
   const gateway = api
     ? new TelegramGateway(api, db, ownerId, {
-        onMessage: (text, id) => app.chief.onOwnerMessage(text, id),
+        onMessage: async (text, id) => {
+          await logChat(db, { role: "owner", channel: "telegram", text });
+          await app.chief.onOwnerMessage(text, id);
+        },
         onApprovalButton: (approvalId, action) => app.chief.onApprovalButton(approvalId, action),
       })
     : undefined;

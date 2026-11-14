@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { pendingApprovals } from "@boma/core";
 import { Shell } from "@/components/shell";
 import { db, env, requireOwner } from "@/lib/server";
@@ -10,8 +11,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const e = env();
   const simulation = !(e.ANTHROPIC_API_KEY && (e.OPENAI_API_KEY || e.DEEPSEEK_API_KEY));
   return (
-    <Shell pending={pending} simulation={simulation}>
-      {children}
-    </Shell>
+    <Suspense>
+      <Shell pending={pending} simulation={simulation}>
+        {children}
+      </Shell>
+    </Suspense>
   );
 }
