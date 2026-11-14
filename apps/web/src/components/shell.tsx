@@ -268,7 +268,7 @@ function Sidebar({
           <div className="grid size-8 place-items-center rounded-xl bg-gradient-to-br from-amber to-coral font-display text-sm font-extrabold text-ink-950">
             B
           </div>
-          <span className="font-display text-[15px] font-bold">Boma</span>
+          <span className="font-display text-[15px] font-bold">Boma Bot Pro</span>
         </Link>
         {onCollapse && (
           <button onClick={onCollapse} className="btn-ghost p-2" aria-label="Collapse sidebar">
@@ -445,7 +445,7 @@ export function Shell({
           <button onClick={() => setDrawer(true)} className="btn-ghost p-2" aria-label="Menu">
             <Menu className="size-5" />
           </button>
-          <span className="font-display font-bold">Boma</span>
+          <span className="font-display font-bold">Boma Bot Pro</span>
           <NewChatButton />
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>

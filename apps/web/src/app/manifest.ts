@@ -3,8 +3,8 @@ import type { MetadataRoute } from "next";
 /** Installable app (phone home screen or desktop). Works offline via public/sw.js. */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Boma AI Workforce",
-    short_name: "Boma",
+    name: "Boma Bot Pro",
+    short_name: "Boma Bot",
     description: "Chat with your Chief of Staff and the bots it coordinates.",
     start_url: "/",
     scope: "/",

@@ -1,4 +1,4 @@
-# Boma AI Workforce — Build Handoff Package
+# Boma Bot Pro (Boma AI Workforce) — Build Handoff Package
 
 A personal "company" of editable AI bots, coordinated by a Chief of Staff, where **Claude and OpenAI check each other's work** before anything becomes a final output.
 

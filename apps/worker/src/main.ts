@@ -129,7 +129,7 @@ async function main() {
     ? "🧪 SIMULATION mode (scripted AI, A$0, outputs labelled)"
     : "live providers";
   console.log(
-    `Boma AI Workforce worker running — ${mode}. Telegram: ${gateway ? "on" : "off (console)"}`,
+    `Boma Bot Pro worker running — ${mode}. Telegram: ${gateway ? "on" : "off (console)"}`,
   );
   await notify.send(`👋 Worker started — ${mode}. Send /help for commands.`);
   await worker.start();

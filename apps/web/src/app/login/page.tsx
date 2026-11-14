@@ -15,7 +15,7 @@ export default async function LoginPage() {
             B
           </div>
           <div>
-            <div className="font-display text-lg font-bold">Boma AI Workforce</div>
+            <div className="font-display text-lg font-bold">Boma Bot Pro</div>
             <div className="text-xs text-mist-400">Your Chief of Staff and bots</div>
           </div>
         </div>

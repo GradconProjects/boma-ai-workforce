@@ -3,9 +3,9 @@ import { Pwa } from "@/components/pwa";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Boma AI Workforce",
+  title: "Boma Bot Pro",
   description: "Chat with your Chief of Staff and the bots it coordinates.",
-  appleWebApp: { capable: true, title: "Boma", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "Boma Bot", statusBarStyle: "black-translucent" },
   icons: { icon: "/icons/icon-192.png", apple: "/icons/icon-180.png" },
 };
 
