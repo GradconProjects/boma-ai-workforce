@@ -12,6 +12,7 @@ import {
 } from "@boma/llm";
 import { DualReviewer } from "@boma/review";
 import { ChiefOfStaff } from "./chief/chief";
+import { draftCreativeHandler } from "./chief/draft-creative";
 import { draftPostHandler } from "./chief/draft-post";
 import type { Notifier } from "./chief/notifier";
 
@@ -25,6 +26,8 @@ export interface AppOptions {
   prices: PriceTable;
   /** Simulation: scripted providers, no network, no spend recorded against real APIs. */
   providers?: Partial<Record<"anthropic" | "openai", LlmProvider>>;
+  /** True when providers are the labelled simulation set. */
+  simulated?: boolean;
 }
 
 export function modelsFromEnv(env: Env) {
@@ -73,6 +76,20 @@ export async function buildApp(o: AppOptions) {
   const reviewer = new DualReviewer(o.db, llm);
   const chiefBot = await loadBotSettings(o.db, "chief-of-staff");
   const chief = new ChiefOfStaff({ db: o.db, policy: o.policy, llm, notify: o.notify, models, tz });
+  const limits = {
+    chiefBotId: chiefBot.id,
+    chiefMonthlyAud: await scopeLimit(
+      o.db,
+      "bot:chief-of-staff",
+      o.policy.budget.allocations["chief-of-staff"] ?? chiefBot.frontmatter.budget.monthly_aud,
+    ),
+    reviewMonthlyAud: await scopeLimit(
+      o.db,
+      "dual-review",
+      o.policy.budget.allocations["dual-review"] ?? 5,
+    ),
+    taskMaxAud: chiefBot.frontmatter.budget.max_task_aud,
+  };
   const draftPost = draftPostHandler({
     db: o.db,
     policy: o.policy,
@@ -80,22 +97,18 @@ export async function buildApp(o: AppOptions) {
     notify: o.notify,
     models,
     tz,
-    limits: {
-      chiefBotId: chiefBot.id,
-      chiefMonthlyAud: await scopeLimit(
-        o.db,
-        "bot:chief-of-staff",
-        o.policy.budget.allocations["chief-of-staff"] ?? chiefBot.frontmatter.budget.monthly_aud,
-      ),
-      reviewMonthlyAud: await scopeLimit(
-        o.db,
-        "dual-review",
-        o.policy.budget.allocations["dual-review"] ?? 5,
-      ),
-      taskMaxAud: chiefBot.frontmatter.budget.max_task_aud,
-    },
+    limits,
   });
-  return { chief, llm, reviewer, handlers: [draftPost], models, tz };
+  const draftCreative = draftCreativeHandler({
+    db: o.db,
+    policy: o.policy,
+    reviewer,
+    notify: o.notify,
+    models,
+    limits,
+    simulated: Boolean(o.simulated),
+  });
+  return { chief, llm, reviewer, handlers: [draftPost, draftCreative], models, tz };
 }
 
 export { MockProvider };

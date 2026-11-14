@@ -53,12 +53,18 @@ importers:
       '@boma/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@boma/design-engine':
+        specifier: workspace:*
+        version: link:../../packages/design-engine
       '@boma/llm':
         specifier: workspace:*
         version: link:../../packages/llm
       '@boma/review':
         specifier: workspace:*
         version: link:../../packages/review
+      '@boma/studio':
+        specifier: workspace:*
+        version: link:../../packages/studio
       pg:
         specifier: 8.23.1
         version: 8.23.1
@@ -114,6 +120,12 @@ importers:
         specifier: 8.23.1
         version: 8.23.1
 
+  packages/design-engine:
+    dependencies:
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
   packages/llm:
     dependencies:
       '@anthropic-ai/sdk':
@@ -140,6 +152,21 @@ importers:
       '@boma/llm':
         specifier: workspace:*
         version: link:../llm
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+
+  packages/studio:
+    dependencies:
+      '@boma/bots':
+        specifier: workspace:*
+        version: link:../bots
+      '@boma/core':
+        specifier: workspace:*
+        version: link:../core
+      '@boma/design-engine':
+        specifier: workspace:*
+        version: link:../design-engine
       zod:
         specifier: 4.6.7
         version: 4.6.7

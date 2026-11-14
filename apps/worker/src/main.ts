@@ -2,27 +2,42 @@ import { hostname } from "node:os";
 import pg from "pg";
 import { listBotFiles, loadBotFile, syncBot } from "@boma/bots";
 import { HttpTelegramApi, TelegramGateway } from "@boma/connectors";
-import { loadEnv, loadPolicy, redact, requireEnv } from "@boma/core";
+import { loadEnv, loadPolicy, parseEnv, redact, requireEnv } from "@boma/core";
 import { migrateUp } from "@boma/db";
 import { PriceTable } from "@boma/llm";
+import { seedBrands } from "@boma/studio";
 import { buildApp } from "./app";
-import type { Notifier } from "./chief/notifier";
+import { ConsoleNotifier, type Notifier } from "./chief/notifier";
+import { SIM_MODELS, simulationPrices, simulationProviders } from "./simulation";
 import { Worker } from "./worker";
 import { loadWorkspaceConfig, syncWorkspaces } from "./workspaces";
 
-/** Worker entry point: pnpm worker. Runs on the owner's PC first (hybrid plan). */
+/**
+ * Worker entry point.
+ *   pnpm worker     — real providers + Telegram (needs keys in .env)
+ *   pnpm simulate   — labelled simulation: scripted AI, A$0, Telegram optional
+ */
 async function main() {
-  const env = requireEnv(loadEnv(), [
-    "DATABASE_URL",
-    "TELEGRAM_BOT_TOKEN",
-    "TELEGRAM_OWNER_USER_ID",
-    "ANTHROPIC_API_KEY",
-    "ANTHROPIC_MODEL_MAKER",
-    "ANTHROPIC_MODEL_CHEAP",
-    "OPENAI_API_KEY",
-    "OPENAI_MODEL_CHECKER",
-    "USD_TO_AUD_RATE",
-  ]);
+  const simulated = process.env.BOMA_SIMULATION === "1";
+  const loaded = loadEnv();
+  const env = simulated
+    ? parseEnv({
+        ...process.env,
+        ...SIM_MODELS,
+        USD_TO_AUD_RATE: process.env.USD_TO_AUD_RATE || "1.5",
+      })
+    : requireEnv(loaded, [
+        "DATABASE_URL",
+        "TELEGRAM_BOT_TOKEN",
+        "TELEGRAM_OWNER_USER_ID",
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_MODEL_MAKER",
+        "ANTHROPIC_MODEL_CHEAP",
+        "OPENAI_API_KEY",
+        "OPENAI_MODEL_CHECKER",
+        "USD_TO_AUD_RATE",
+      ]);
+  if (!env.DATABASE_URL) throw new Error("DATABASE_URL is not set in .env");
   const policy = loadPolicy();
   const db = new pg.Pool({ connectionString: env.DATABASE_URL, max: 5 });
 
@@ -38,18 +53,33 @@ async function main() {
     client.release();
   }
   await syncWorkspaces(db, loadWorkspaceConfig());
+  await seedBrands(db);
 
+  const useTelegram = Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_OWNER_USER_ID);
   const ownerId = Number(env.TELEGRAM_OWNER_USER_ID);
-  const api = new HttpTelegramApi(env.TELEGRAM_BOT_TOKEN);
-  const notify: Notifier = {
-    send: (text, buttons) => api.sendMessage(ownerId, text, buttons),
-    edit: (id, text) => api.editMessage(ownerId, id, text),
-  };
-  const app = await buildApp({ db, policy, env, notify, prices: PriceTable.load() });
-  const gateway = new TelegramGateway(api, db, ownerId, {
-    onMessage: (text, id) => app.chief.onOwnerMessage(text, id),
-    onApprovalButton: (approvalId, action) => app.chief.onApprovalButton(approvalId, action),
+  const api = useTelegram ? new HttpTelegramApi(env.TELEGRAM_BOT_TOKEN!) : null;
+  const notify: Notifier = api
+    ? {
+        send: (text, buttons) => api.sendMessage(ownerId, text, buttons),
+        edit: (id, text) => api.editMessage(ownerId, id, text),
+      }
+    : new ConsoleNotifier();
+
+  const app = await buildApp({
+    db,
+    policy,
+    env,
+    notify,
+    prices: simulated ? simulationPrices() : PriceTable.load(),
+    providers: simulated ? simulationProviders() : undefined,
+    simulated,
   });
+  const gateway = api
+    ? new TelegramGateway(api, db, ownerId, {
+        onMessage: (text, id) => app.chief.onOwnerMessage(text, id),
+        onApprovalButton: (approvalId, action) => app.chief.onApprovalButton(approvalId, action),
+      })
+    : undefined;
   const worker = new Worker({
     db,
     policy,
@@ -68,8 +98,13 @@ async function main() {
   };
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
-  console.log("Boma AI Workforce worker running. Send /help to your bot on Telegram.");
-  await notify.send("👋 Worker started. Send /help for commands.");
+  const mode = simulated
+    ? "🧪 SIMULATION mode (scripted AI, A$0, outputs labelled)"
+    : "live providers";
+  console.log(
+    `Boma AI Workforce worker running — ${mode}. Telegram: ${gateway ? "on" : "off (console)"}`,
+  );
+  await notify.send(`👋 Worker started — ${mode}. Send /help for commands.`);
   await worker.start();
   await db.end();
 }

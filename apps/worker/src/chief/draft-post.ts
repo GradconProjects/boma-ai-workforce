@@ -168,9 +168,21 @@ export function approvalMessage(
   a: { preview: Record<string, unknown>; scheduled_at: Date | null; expires_at: Date },
   tz: string,
 ): string {
-  const p = a.preview as { text: string; workspace: string; review: string; costAud: number };
+  const p = a.preview as {
+    text: string;
+    workspace: string;
+    review: string;
+    costAud: number;
+    label?: string;
+    simulated?: boolean;
+  };
   return [
-    `📝 Approval needed · ${p.workspace} · Facebook Page post`,
+    ...(p.simulated
+      ? [
+          "🧪 SIMULATION — not real AI output; nothing here was written or checked by Claude or OpenAI.",
+        ]
+      : []),
+    `📝 Approval needed · ${p.workspace} · ${p.label ?? "Facebook Page post"}`,
     "",
     p.text,
     "",

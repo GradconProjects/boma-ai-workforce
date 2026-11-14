@@ -1,0 +1,14 @@
+{
+  "name": "@boma/studio",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@boma/core": "workspace:*",
+    "@boma/design-engine": "workspace:*",
+    "zod": "4.6.7",
+    "@boma/bots": "workspace:*"
+  }
+}

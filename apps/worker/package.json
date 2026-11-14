@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "tsx src/main.ts"
+    "start": "tsx src/main.ts",
+    "simulate": "BOMA_SIMULATION=1 tsx src/main.ts"
   },
   "dependencies": {
     "@boma/bots": "workspace:*",
@@ -14,6 +15,8 @@
     "@boma/review": "workspace:*",
     "pg": "8.23.1",
     "yaml": "2.9.1",
-    "zod": "4.6.7"
+    "zod": "4.6.7",
+    "@boma/studio": "workspace:*",
+    "@boma/design-engine": "workspace:*"
   }
 }

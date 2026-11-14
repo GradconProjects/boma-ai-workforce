@@ -11,6 +11,7 @@ import {
   type TaskHandler,
 } from "@boma/core";
 import type { TelegramGateway } from "@boma/connectors";
+import { syncItemStatusesFromApprovals } from "@boma/studio";
 import { eveningReport, morningBrief } from "./chief/briefs";
 import type { ChiefOfStaff } from "./chief/chief";
 import type { Notifier } from "./chief/notifier";
@@ -82,6 +83,7 @@ export class Worker {
   async maintenanceTick(now = new Date()): Promise<void> {
     await this.deps.chief.onExpiredApprovals(await expireDueApprovals(this.deps.db, now));
     await this.deps.chief.sendUnsentApprovals();
+    await syncItemStatusesFromApprovals(this.deps.db);
   }
 
   async start(): Promise<void> {

@@ -42,6 +42,8 @@ export interface ReviewTask {
   platform: { name: string; maxChars: number };
   /** Extra maker guidance: brand voice, format. */
   makerGuidance: string;
+  /** Extra deterministic format checks (e.g. required copy fields); failures go back to the maker. */
+  extraChecks?: (text: string) => string[];
 }
 
 export interface ReviewConfig {
@@ -154,6 +156,16 @@ export class DualReviewer {
         claimRegister: task.claimRegister,
         sourceUrls: task.untrustedInputs.map((i) => i.source).filter((s) => s.startsWith("http")),
       });
+      for (const problem of task.extraChecks?.(output.text) ?? []) {
+        pre.push({
+          id: `X${pre.length + 1}`,
+          severity: "major",
+          category: "quality",
+          location: "text",
+          problem,
+          fix: "Fix this so the output fits the required format.",
+        });
+      }
       if (pre.length) {
         const rec: RoundRecord = {
           round,
